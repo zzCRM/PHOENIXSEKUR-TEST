@@ -130,7 +130,10 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
   return (
     <div className="h-full max-h-[100dvh] bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 border-b border-sidebar-border shrink-0">
+      <div className={cn(
+        'flex items-center justify-between px-3 sm:px-4 border-b border-sidebar-border shrink-0',
+        isMobileDrawer ? 'safe-top pb-3 min-h-14' : 'h-14 sm:h-16',
+      )}>
         <div className="flex items-center gap-2.5 min-w-0">
           <img
             src="/phoenix-sekur-logo.png"
