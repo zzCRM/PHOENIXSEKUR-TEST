@@ -1,10 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
-RUN apk add --no-cache wget
+RUN apk add --no-cache wget openssl
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev
 COPY prisma ./prisma
-RUN npx prisma generate
+RUN npm install --omit=dev --ignore-scripts && npx prisma generate
 COPY src ./src
 COPY scripts ./scripts
 RUN mkdir -p uploads
