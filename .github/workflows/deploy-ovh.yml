@@ -20,6 +20,7 @@ jobs:
           command_timeout: 20m
           script: |
             set -e
+            git config --global --add safe.directory /opt/phoenixsekur
             cd /opt/phoenixsekur
             git fetch origin
             git checkout cursor/migrate-off-base44-6bc2 || git checkout main
