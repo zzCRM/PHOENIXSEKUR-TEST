@@ -76,8 +76,18 @@ const baseNavGroups = [
   },
 ];
 
-const getNavGroups = (isPlatformOwner, isAdmin) => {
-  const groups = [...baseNavGroups];
+const getNavGroups = (isPlatformOwner, isAdmin, isSuperAdminUser) => {
+  const groups = [];
+  if (isSuperAdminUser) {
+    groups.push({
+      label: 'Plateforme',
+      items: [
+        { icon: ShieldCheck, label: 'Super Admin', path: '/super-admin' },
+        { icon: UserPlus, label: 'Onboarding société', path: '/onboarding' },
+      ],
+    });
+  }
+  groups.push(...baseNavGroups);
   if (isAdmin) {
     groups.push({
       label: 'Administration',
@@ -87,7 +97,7 @@ const getNavGroups = (isPlatformOwner, isAdmin) => {
       ],
     });
   }
-  if (isPlatformOwner) {
+  if (isPlatformOwner && !isSuperAdminUser) {
     groups.push({
       label: 'Admin',
       items: [
@@ -104,7 +114,8 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
   
   const PLATFORM_OWNER_EMAIL = 'contact@ppsecurity.fr';
   const isPlatformOwner = user?.email === PLATFORM_OWNER_EMAIL;
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdminUser = !!user?.superadmin;
 
   const handleLinkClick = () => {
     if (onMobileClose) {
@@ -139,7 +150,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-4 overflow-y-auto">
-        {getNavGroups(isPlatformOwner, isAdmin).map((group) => (
+        {getNavGroups(isPlatformOwner, isAdmin, isSuperAdminUser).map((group) => (
           <div key={group.label}>
             {!collapsed && (
               <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40">

@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js';
 import entityRoutes from './routes/entities.js';
 import fileRoutes from './routes/files.js';
 import userRoutes from './routes/users.js';
+import adminRoutes from './routes/admin.js';
 import { authMiddleware } from './middleware/auth.js';
 
 dotenv.config();
@@ -36,6 +37,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/entities', entityRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

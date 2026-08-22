@@ -128,7 +128,8 @@ export const phoenix = {
         body: JSON.stringify({ email, password }),
       });
       if (result.access_token) setToken(result.access_token);
-      return result;
+      const me = await apiFetch('/auth/me');
+      return { ...result, user: { ...result.user, superadmin: me.superadmin } };
     },
 
     logout(redirectUrl) {
@@ -153,6 +154,30 @@ export const phoenix = {
         method: 'POST',
         body: JSON.stringify({ email, role }),
       });
+    },
+  },
+
+  admin: {
+    async stats() {
+      return apiFetch('/admin/stats');
+    },
+    async listUsers() {
+      return apiFetch('/admin/users');
+    },
+    async createUser(data) {
+      return apiFetch('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    async updateUser(id, data) {
+      return apiFetch(`/admin/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    async listCompanies() {
+      return apiFetch('/admin/companies');
     },
   },
 

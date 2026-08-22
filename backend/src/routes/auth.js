@@ -40,9 +40,13 @@ router.post('/login', async (req, res) => {
   }
 });
 
+import { isSuperAdmin } from '../lib/superadmin.js';
+
 router.get('/me', requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
   if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const superadmin = isSuperAdmin({ email: user.email, role: user.role });
 
   res.json({
     id: user.id,
@@ -51,6 +55,7 @@ router.get('/me', requireAuth, async (req, res) => {
     company_id: user.companyId,
     first_name: user.firstName,
     last_name: user.lastName,
+    superadmin,
   });
 });
 

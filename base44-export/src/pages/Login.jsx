@@ -19,8 +19,13 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
-      const returnUrl = searchParams.get('return') || '/';
+      const result = await base44.auth.loginViaEmailPassword(email, password);
+      const me = result.user?.superadmin != null
+        ? result.user
+        : await base44.auth.me().catch(() => null);
+      const returnUrl = me?.superadmin
+        ? '/super-admin'
+        : (searchParams.get('return') || '/');
       navigate(returnUrl, { replace: true });
       window.location.reload();
     } catch (err) {

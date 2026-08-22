@@ -37,6 +37,7 @@ import HeuresCollaborateurs from '@/pages/HeuresCollaborateurs';
 import RapportsPDF from '@/pages/RapportsPDF';
 import Leads from '@/pages/Leads';
 import Login from '@/pages/Login';
+import SuperAdmin from '@/pages/SuperAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -89,6 +90,7 @@ const AuthenticatedApp = () => {
         <Route path="/heures-collaborateurs" element={<HeuresCollaborateurs />} />
         <Route path="/rapports-pdf" element={<RapportsPDF />} />
         <Route path="/leads" element={<Leads />} />
+        <Route path="/super-admin" element={<SuperAdmin />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

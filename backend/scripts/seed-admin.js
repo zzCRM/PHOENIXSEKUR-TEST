@@ -17,7 +17,7 @@ const ADMIN = {
   companyId: process.env.ADMIN_COMPANY_ID || '69edb44339460eb505c2a699',
   firstName: 'Admin',
   lastName: 'Phoenix',
-  role: 'admin',
+  role: process.env.ADMIN_ROLE || 'superadmin',
 };
 
 async function main() {

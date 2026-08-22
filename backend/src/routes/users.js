@@ -6,6 +6,8 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
+import { isSuperAdmin } from '../lib/superadmin.js';
+
 // Remplace base44.users.inviteUser
 router.post('/invite', requireAuth, async (req, res) => {
   try {
@@ -14,7 +16,11 @@ router.post('/invite', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Email required' });
     }
 
-    const companyId = req.user.companyId;
+    const superadmin = isSuperAdmin(req.user);
+    if (!superadmin && !req.user.companyId) {
+      return res.status(403).json({ error: 'Company required' });
+    }
+    const companyId = req.body.company_id || req.user.companyId;
     const appRole = role === 'admin' ? 'admin' : 'user';
 
     const existing = await prisma.user.findUnique({ where: { email } });
