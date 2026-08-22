@@ -1,0 +1,58 @@
+{
+  "name": "Conge",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "conge_paye",
+        "rtt",
+        "maladie",
+        "sans_solde",
+        "autre"
+      ],
+      "default": "conge_paye"
+    },
+    "date_debut": {
+      "type": "string",
+      "format": "date"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date"
+    },
+    "nb_jours": {
+      "type": "number"
+    },
+    "motif": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "en_attente",
+        "approuve",
+        "refuse"
+      ],
+      "default": "en_attente"
+    },
+    "reponse": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "date_debut",
+    "date_fin",
+    "company_id"
+  ]
+}

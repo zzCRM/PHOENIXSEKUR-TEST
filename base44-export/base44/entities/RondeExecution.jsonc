@@ -1,0 +1,90 @@
+{
+  "name": "RondeExecution",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "ronde_id": {
+      "type": "string"
+    },
+    "ronde_name": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "mission_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "start_time": {
+      "type": "string"
+    },
+    "end_time": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "terminee",
+        "incomplete"
+      ],
+      "default": "en_cours"
+    },
+    "checkpoints_done": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "checkpoint_id": {
+            "type": "string"
+          },
+          "checkpoint_name": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "anomaly": {
+            "type": "boolean"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "nfc_validated": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ronde_id",
+    "date",
+    "agent_id",
+    "company_id"
+  ]
+}

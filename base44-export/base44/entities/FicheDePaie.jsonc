@@ -1,0 +1,41 @@
+{
+  "name": "FicheDePaie",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "period": {
+      "type": "string"
+    },
+    "month": {
+      "type": "number"
+    },
+    "year": {
+      "type": "number"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "gross_amount": {
+      "type": "number"
+    },
+    "net_amount": {
+      "type": "number"
+    },
+    "hours_worked": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "agent_id",
+    "period",
+    "company_id"
+  ]
+}

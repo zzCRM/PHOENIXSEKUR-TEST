@@ -1,0 +1,228 @@
+{
+  "name": "Agent",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "description": "ID de la soci\u00e9t\u00e9 de s\u00e9curit\u00e9"
+    },
+    "first_name": {
+      "type": "string"
+    },
+    "last_name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "phone2": {
+      "type": "string",
+      "description": "T\u00e9l\u00e9phone secondaire"
+    },
+    "card_number": {
+      "type": "string",
+      "description": "Num\u00e9ro de carte professionnelle CNAPS"
+    },
+    "card_expiry": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "actif",
+        "inactif",
+        "en_mission"
+      ],
+      "default": "actif"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "hire_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "hourly_rate": {
+      "type": "number"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID utilisateur li\u00e9 au compte"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "superviseur",
+        "admin"
+      ],
+      "default": "agent"
+    },
+    "civilite": {
+      "type": "string",
+      "enum": [
+        "M.",
+        "Mme",
+        "Autre"
+      ]
+    },
+    "genre": {
+      "type": "string",
+      "enum": [
+        "Homme",
+        "Femme",
+        "Autre"
+      ]
+    },
+    "date_naissance": {
+      "type": "string",
+      "format": "date"
+    },
+    "lieu_naissance": {
+      "type": "string"
+    },
+    "nationalite": {
+      "type": "string"
+    },
+    "groupe_sanguin": {
+      "type": "string",
+      "enum": [
+        "A+",
+        "A-",
+        "B+",
+        "B-",
+        "AB+",
+        "AB-",
+        "O+",
+        "O-",
+        "Inconnu"
+      ]
+    },
+    "fonction": {
+      "type": "string",
+      "description": "SSIAP1, SSIAP2, ADS, etc."
+    },
+    "type_employe": {
+      "type": "string",
+      "enum": [
+        "Employ\u00e9",
+        "Int\u00e9rimaire",
+        "Sous-traitant"
+      ],
+      "default": "Employ\u00e9"
+    },
+    "planifiable": {
+      "type": "boolean",
+      "default": true
+    },
+    "note_evaluation": {
+      "type": "number",
+      "description": "Note sur 5"
+    },
+    "date_fin_contrat": {
+      "type": "string",
+      "format": "date"
+    },
+    "numero_securite_sociale": {
+      "type": "string"
+    },
+    "iban": {
+      "type": "string"
+    },
+    "acces_espace_agent": {
+      "type": "boolean",
+      "default": true
+    },
+    "acces_planning": {
+      "type": "boolean",
+      "default": true
+    },
+    "acces_conges": {
+      "type": "boolean",
+      "default": true
+    },
+    "acces_documents": {
+      "type": "boolean",
+      "default": true
+    },
+    "acces_fiches_paie": {
+      "type": "boolean",
+      "default": true
+    },
+    "acces_main_courante": {
+      "type": "boolean",
+      "default": false
+    },
+    "acces_rondes": {
+      "type": "boolean",
+      "default": true
+    },
+    "acces_pti": {
+      "type": "boolean",
+      "default": true
+    },
+    "droits_portail": {
+      "type": "object",
+      "description": "Droits d'acc\u00e8s au portail agent par module",
+      "properties": {
+        "acces_planning": {
+          "type": "boolean",
+          "default": true
+        },
+        "acces_services": {
+          "type": "boolean",
+          "default": true
+        },
+        "acces_ecarts": {
+          "type": "boolean",
+          "default": false
+        },
+        "acces_rondes": {
+          "type": "boolean",
+          "default": true
+        },
+        "acces_main_courante": {
+          "type": "boolean",
+          "default": false
+        },
+        "acces_pti": {
+          "type": "boolean",
+          "default": true
+        },
+        "acces_conges": {
+          "type": "boolean",
+          "default": true
+        },
+        "acces_documents": {
+          "type": "boolean",
+          "default": true
+        },
+        "acces_consignes": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  },
+  "required": [
+    "first_name",
+    "last_name",
+    "company_id"
+  ]
+}

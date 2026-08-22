@@ -1,0 +1,67 @@
+{
+  "name": "CompanySettings",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "siret": {
+      "type": "string"
+    },
+    "cnaps_number": {
+      "type": "string",
+      "description": "Num\u00e9ro d'autorisation CNAPS"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "website": {
+      "type": "string"
+    },
+    "logo_url": {
+      "type": "string"
+    },
+    "legal_form": {
+      "type": "string",
+      "description": "Forme juridique (SARL, SAS, ...)"
+    },
+    "director_name": {
+      "type": "string"
+    },
+    "tva_number": {
+      "type": "string"
+    },
+    "iban": {
+      "type": "string"
+    },
+    "bic": {
+      "type": "string"
+    },
+    "insurance_number": {
+      "type": "string",
+      "description": "Num\u00e9ro assurance RC Pro"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "company_name"
+  ]
+}

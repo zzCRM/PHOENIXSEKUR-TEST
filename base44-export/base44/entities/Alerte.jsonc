@@ -1,0 +1,72 @@
+{
+  "name": "Alerte",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "debut_service",
+        "fin_service",
+        "debut_ronde",
+        "fin_ronde",
+        "pti_alerte",
+        "pti_ok",
+        "incident",
+        "geofence"
+      ],
+      "default": "debut_service"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "time": {
+      "type": "string"
+    },
+    "read": {
+      "type": "boolean",
+      "default": false
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "attention",
+        "urgent"
+      ],
+      "default": "info"
+    }
+  },
+  "required": [
+    "company_id",
+    "type",
+    "message"
+  ]
+}

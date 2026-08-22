@@ -1,0 +1,320 @@
+{
+  "name": "Site",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "address_complement": {
+      "type": "string",
+      "description": "Compl\u00e9ment d'adresse"
+    },
+    "city": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string",
+      "default": "FRANCE"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Photo / image du site"
+    },
+    "nfc_tag_id": {
+      "type": "string",
+      "description": "ID du tag NFC du site pour prise de service"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "gardiennage",
+        "surveillance",
+        "intervention",
+        "ronde",
+        "evenementiel"
+      ],
+      "default": "gardiennage"
+    },
+    "instructions": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "actif",
+        "inactif"
+      ],
+      "default": "actif"
+    },
+    "geofence_radius": {
+      "type": "number",
+      "default": 200,
+      "description": "Rayon de g\u00e9ofence en m\u00e8tres"
+    },
+    "specialites": {
+      "type": "array",
+      "description": "Sp\u00e9cialit\u00e9s du site avec consignes propres",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "instructions": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "tarif_jour": {
+      "type": "number",
+      "description": "Tarif de jour (\u20ac/h)"
+    },
+    "coef_nuit": {
+      "type": "number",
+      "description": "Coefficient de nuit"
+    },
+    "coef_ferie": {
+      "type": "number",
+      "description": "Coefficient jour f\u00e9ri\u00e9"
+    },
+    "coef_ferie_nuit": {
+      "type": "number",
+      "description": "Coefficient f\u00e9ri\u00e9 de nuit"
+    },
+    "coef_dimanche": {
+      "type": "number",
+      "description": "Coefficient dimanche"
+    },
+    "coef_dimanche_ferie": {
+      "type": "number",
+      "description": "Coefficient dimanche f\u00e9ri\u00e9"
+    },
+    "coef_dimanche_nuit": {
+      "type": "number",
+      "description": "Coefficient dimanche nuit"
+    },
+    "coef_dimanche_ferie_nuit": {
+      "type": "number",
+      "description": "Coefficient dimanche f\u00e9ri\u00e9 nuit"
+    },
+    "tarif_tournee_jour": {
+      "type": "number",
+      "description": "Tarif de jour des tourn\u00e9es"
+    },
+    "coef_tournee_nuit": {
+      "type": "number"
+    },
+    "coef_tournee_ferie": {
+      "type": "number"
+    },
+    "coef_tournee_dimanche": {
+      "type": "number"
+    },
+    "consignes_droits": {
+      "type": "object",
+      "description": "Droits du cahier de consignes",
+      "properties": {
+        "collab_lire": {
+          "type": "boolean",
+          "default": true
+        },
+        "collab_ecrire": {
+          "type": "boolean",
+          "default": true
+        },
+        "collab_modifier": {
+          "type": "boolean",
+          "default": false
+        },
+        "collab_supprimer": {
+          "type": "boolean",
+          "default": false
+        },
+        "client_lire": {
+          "type": "boolean",
+          "default": true
+        },
+        "client_ecrire": {
+          "type": "boolean",
+          "default": false
+        },
+        "client_modifier": {
+          "type": "boolean",
+          "default": false
+        },
+        "client_supprimer": {
+          "type": "boolean",
+          "default": false
+        },
+        "notif_site": {
+          "type": "boolean",
+          "default": true
+        },
+        "notif_non_plannable": {
+          "type": "boolean",
+          "default": false
+        },
+        "notif_client": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "pieces_jointes": {
+      "type": "array",
+      "description": "Pi\u00e8ces jointes du site (URLs de fichiers)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "urgences": {
+      "type": "array",
+      "description": "Num\u00e9ros d'urgence du site",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pointage_arrivee": {
+      "type": "boolean",
+      "default": false,
+      "description": "Pointage NFC \u00e0 l'arriv\u00e9e sur site"
+    },
+    "pointage_depart": {
+      "type": "boolean",
+      "default": false,
+      "description": "Pointage NFC au d\u00e9part du site"
+    },
+    "checkpoints_service": {
+      "type": "array",
+      "description": "Points de contr\u00f4le de d\u00e9but/fin de service",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "photo_url": {
+            "type": "string"
+          },
+          "actif": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "cles": {
+      "type": "array",
+      "description": "Cl\u00e9s du site",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantite": {
+            "type": "number",
+            "default": 1
+          },
+          "detenteur": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "alarmes": {
+      "type": "array",
+      "description": "Alarmes du site",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "agent_ids": {
+      "type": "array",
+      "description": "IDs des collaborateurs affect\u00e9s au site",
+      "items": {
+        "type": "string"
+      }
+    },
+    "parametres_envoi": {
+      "type": "object",
+      "description": "Param\u00e8tres d'envoi et notifications",
+      "properties": {
+        "envoi_main_courante_veille": {
+          "type": "boolean",
+          "default": false
+        },
+        "envoi_bon_intervention_veille": {
+          "type": "boolean",
+          "default": false
+        },
+        "envoi_auto_bon_intervention": {
+          "type": "boolean",
+          "default": false
+        },
+        "envoi_bon_rondes_veille": {
+          "type": "boolean",
+          "default": false
+        },
+        "envoi_bon_rdl_veille": {
+          "type": "boolean",
+          "default": false
+        },
+        "envoi_bon_audits_controles_veille": {
+          "type": "boolean",
+          "default": false
+        },
+        "event_service_non_debute": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "required": [
+    "name",
+    "company_id"
+  ]
+}

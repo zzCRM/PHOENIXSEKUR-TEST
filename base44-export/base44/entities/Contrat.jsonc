@@ -1,0 +1,83 @@
+{
+  "name": "Contrat",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "type_contrat": {
+      "type": "string",
+      "enum": [
+        "cdi",
+        "cdd",
+        "apprentissage",
+        "interim",
+        "client"
+      ],
+      "default": "cdi"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "client"
+      ],
+      "default": "agent"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "target_name": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenu du contrat (texte)"
+    },
+    "date_debut": {
+      "type": "string",
+      "format": "date"
+    },
+    "date_fin": {
+      "type": "string",
+      "format": "date",
+      "description": "Vide pour CDI"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "envoye",
+        "signe",
+        "refuse",
+        "expire"
+      ],
+      "default": "brouillon"
+    },
+    "signature_demandee_at": {
+      "type": "string"
+    },
+    "signature_at": {
+      "type": "string"
+    },
+    "signataire_email": {
+      "type": "string"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "PDF du contrat"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "target_type",
+    "title",
+    "type_contrat"
+  ]
+}
