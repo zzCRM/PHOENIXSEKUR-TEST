@@ -29,7 +29,9 @@ content = open(path, encoding="utf-8").read()
 for key, val in keys.items():
     if key == "SMTP_PASS" and not val:
         continue
-    line = f'{key}={val}'
+    # Guillemets obligatoires : SMTP_FROM contient < > et casse "source .env"
+    escaped = val.replace("\\", "\\\\").replace('"', '\\"')
+    line = f'{key}="{escaped}"'
     pattern = rf"^{re.escape(key)}=.*$"
     if re.search(pattern, content, flags=re.M):
         content = re.sub(pattern, line, content, flags=re.M)
