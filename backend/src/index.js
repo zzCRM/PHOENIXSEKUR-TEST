@@ -8,6 +8,7 @@ import entityRoutes from './routes/entities.js';
 import fileRoutes from './routes/files.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
+import publicRoutes from './routes/public.js';
 import { authMiddleware } from './middleware/auth.js';
 
 dotenv.config();
@@ -34,6 +35,7 @@ app.get('/api/config/google-maps-key', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes);
 app.use('/api/entities', entityRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/users', userRoutes);

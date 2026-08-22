@@ -62,6 +62,37 @@ export async function createAndSendInvitation({
   };
 }
 
+export async function resendInvitation(invitationId, invitedBy) {
+  const invitation = await prisma.invitation.findUnique({ where: { id: invitationId } });
+  if (!invitation) return null;
+  if (invitation.acceptedAt) {
+    throw new Error('Invitation déjà acceptée');
+  }
+
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = invitationExpiryDate();
+
+  const updated = await prisma.invitation.update({
+    where: { id: invitationId },
+    data: { token, expiresAt, invitedBy: invitedBy || invitation.invitedBy },
+  });
+
+  const inviteUrl = `${getAppUrl()}/invitation/${token}`;
+  const emailResult = await sendInvitationEmail({
+    to: updated.email,
+    inviteUrl,
+    invitedByEmail: updated.invitedBy,
+    roleLabel: roleLabel(updated.role),
+  });
+
+  return {
+    invitation: updated,
+    inviteUrl,
+    emailSent: emailResult.sent,
+    emailReason: emailResult.reason,
+  };
+}
+
 export async function getValidInvitation(token) {
   const invitation = await prisma.invitation.findUnique({ where: { token } });
   if (!invitation) return null;

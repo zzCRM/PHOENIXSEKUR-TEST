@@ -192,6 +192,46 @@ export const phoenix = {
     async listCompanies() {
       return apiFetch('/admin/companies');
     },
+    async deleteUser(id) {
+      return apiFetch(`/admin/users/${id}`, { method: 'DELETE' });
+    },
+    async listInvitations() {
+      return apiFetch('/admin/invitations');
+    },
+    async resendInvitation(id) {
+      return apiFetch(`/admin/invitations/${id}/resend`, { method: 'POST' });
+    },
+    async listSignupRequests(status) {
+      const q = status ? `?status=${encodeURIComponent(status)}` : '';
+      return apiFetch(`/admin/signup-requests${q}`);
+    },
+    async approveSignupRequest(id, trial_days) {
+      return apiFetch(`/admin/signup-requests/${id}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({ trial_days }),
+      });
+    },
+    async rejectSignupRequest(id, notes) {
+      return apiFetch(`/admin/signup-requests/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ notes }),
+      });
+    },
+    async updateCompanySubscription(companyId, data) {
+      return apiFetch(`/admin/companies/${companyId}/subscription`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    async getSettings() {
+      return apiFetch('/admin/settings');
+    },
+    async updateSettings(data) {
+      return apiFetch('/admin/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
   },
 
   integrations: {

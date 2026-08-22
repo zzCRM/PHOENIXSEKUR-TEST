@@ -13,11 +13,12 @@ model User {
   id            String   @id @default(cuid())
   email         String   @unique
   passwordHash  String   @map("password_hash")
-  role          String   @default("admin") // admin | agent | client
+  role          String   @default("admin") // admin | agent | client | superadmin
   companyId     String   @map("company_id")
   firstName     String?  @map("first_name")
   lastName      String?  @map("last_name")
   isActive      Boolean  @default(true) @map("is_active")
+  suspendReason String?  @map("suspend_reason")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -39,6 +40,50 @@ model Invitation {
   @@index([email])
   @@index([token])
   @@map("invitations")
+}
+
+model PlatformSettings {
+  id        String   @id @default("default")
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+model SignupRequest {
+  id          String    @id @default(cuid())
+  email       String
+  companyName String?   @map("company_name")
+  firstName   String?   @map("first_name")
+  lastName    String?   @map("last_name")
+  phone       String?
+  message     String?
+  status      String    @default("pending") // pending | approved | rejected
+  trialDays   Int       @default(14) @map("trial_days")
+  trialEndsAt DateTime? @map("trial_ends_at")
+  companyId   String?   @map("company_id")
+  reviewedBy  String?   @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([email])
+  @@map("signup_requests")
+}
+
+model CompanySubscription {
+  companyId     String    @id @map("company_id")
+  status        String    @default("trial") // trial | active | suspended
+  plan          String    @default("trial")
+  trialEndsAt   DateTime? @map("trial_ends_at")
+  suspendedAt   DateTime? @map("suspended_at")
+  suspendReason String?   @map("suspend_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("company_subscriptions")
 }
 
 // ─── Entity tables (mirrors Base44 entities) ───────────────────────────────

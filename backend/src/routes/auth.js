@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
+import { isCompanyAccessAllowed } from '../lib/platform-settings.js';
 import { getValidInvitation, roleLabel } from '../lib/invitations.js';
 
 const router = Router();
@@ -17,6 +18,15 @@ router.post('/login', async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (!isSuperAdmin({ email: user.email, role: user.role })) {
+      const companyOk = await isCompanyAccessAllowed(user.companyId);
+      if (!companyOk) {
+        return res.status(403).json({
+          error: 'Accès suspendu — contactez le support (impayé ou essai expiré)',
+        });
+      }
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
