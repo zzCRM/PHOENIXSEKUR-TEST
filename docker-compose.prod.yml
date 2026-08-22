@@ -34,10 +34,7 @@ services:
     volumes:
       - uploads_data:/app/uploads
       - ./base44-export/data/exports:/imports:ro
-    command: >
-      sh -c "npx prisma db push &&
-             node scripts/seed-admin.js 2>/dev/null || true &&
-             node src/index.js"
+    entrypoint: ["./docker-entrypoint.sh"]
 
   frontend:
     build:

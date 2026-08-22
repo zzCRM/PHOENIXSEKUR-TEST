@@ -6,6 +6,7 @@ COPY prisma ./prisma
 RUN npm install --omit=dev --ignore-scripts && npx prisma generate
 COPY src ./src
 COPY scripts ./scripts
-RUN mkdir -p uploads
+COPY docker-entrypoint.sh ./
+RUN mkdir -p uploads && chmod +x docker-entrypoint.sh
 EXPOSE 3001
-CMD ["npm", "start"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
