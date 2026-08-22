@@ -1,17 +1,16 @@
-# Déploiement automatique OVH — comme Phoenix CRM sur Hetzner
+# Configure SMTP sur le VPS OVH — sans Termius
+# Déclenché manuellement ou après ajout du secret SMTP_PASS
 
-name: Deploy Phoenix Sekur (OVH)
+name: Configure SMTP (OVH)
 
 on:
-  push:
-    branches: [main, cursor/migrate-off-base44-6bc2]
   workflow_dispatch:
 
 jobs:
-  deploy:
+  configure:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Configure SMTP on VPS
         uses: appleboy/ssh-action@v1.2.0
         env:
           SMTP_HOST: smtp.ionos.fr
@@ -23,19 +22,22 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 20m
+          command_timeout: 10m
           envs: SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_FROM,SMTP_PASS
           script: |
             set -e
+            if [ -z "$SMTP_PASS" ]; then
+              echo "❌ Secret GitHub SMTP_PASS manquant."
+              echo "   Ajoutez-le dans Settings → Secrets → Actions du repo."
+              exit 1
+            fi
             sudo git config --global --add safe.directory /opt/phoenixsekur
             cd /opt/phoenixsekur
             sudo git fetch origin
             sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
             sudo git pull
-            if [ -n "$SMTP_PASS" ]; then
-              sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
-                SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" \
-                bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production
-            fi
+            sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
+              SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" \
+              bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production
             sudo bash scripts/deploy-ovh.sh
-            echo "✅ Déployé $(date)"
+            echo "✅ SMTP configuré + redéployé $(date)"
