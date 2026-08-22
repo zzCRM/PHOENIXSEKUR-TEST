@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import CompanyHeader from './CompanyHeader';
 import { cn } from '@/lib/utils';
 import RGPDConsent from '@/components/rgpd/RGPDConsent';
-import { Menu, Search, Bell, LogOut } from 'lucide-react';
+import { Menu, Search, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -49,19 +49,25 @@ export default function AppLayout() {
         collapsed ? 'xl:ml-[72px]' : 'xl:ml-[240px]',
       )}>
         {/* Top bar — visible jusqu'à xl (mobile + tablette) */}
-        <header className="xl:hidden sticky top-0 z-30 bg-white border-b border-gray-200">
+        <header className="xl:hidden sticky top-0 z-30 bg-white border-b border-gray-200 pt-[env(safe-area-inset-top)]">
           <div className="flex items-center gap-2 px-3 py-2.5">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="p-2.5 -ml-1 rounded-lg hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 -ml-1 rounded-lg hover:bg-gray-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
               aria-label="Ouvrir le menu"
             >
               <Menu className="w-5 h-5 text-gray-700" />
             </button>
 
+            <img
+              src="/phoenix-sekur-logo.png"
+              alt="Phoenix Sekur"
+              className="w-8 h-8 rounded-lg object-contain bg-black shrink-0"
+            />
+
             <div className="flex-1 relative min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <Input
                 type="search"
                 placeholder="Rechercher..."
@@ -71,16 +77,8 @@ export default function AppLayout() {
 
             <button
               type="button"
-              className="p-2.5 rounded-lg hover:bg-gray-100 transition-colors relative min-w-[44px] min-h-[44px] flex items-center justify-center"
-              aria-label="Notifications"
-            >
-              <Bell className="w-5 h-5 text-gray-700" />
-            </button>
-
-            <button
-              type="button"
               onClick={() => logout()}
-              className="p-2.5 rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 rounded-lg hover:bg-red-50 text-gray-700 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
               aria-label="Déconnexion"
               title={user?.email || 'Déconnexion'}
             >

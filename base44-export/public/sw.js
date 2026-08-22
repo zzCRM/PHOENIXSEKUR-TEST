@@ -1,6 +1,15 @@
 /* Service worker minimal — cache shell pour usage terrain */
-const CACHE = 'phoenix-sekur-v1';
-const ASSETS = ['/', '/espace-agent', '/manifest.json', '/phoenix-icon.svg'];
+const CACHE = 'phoenix-sekur-v2';
+const ASSETS = [
+  '/',
+  '/espace-agent',
+  '/manifest.json',
+  '/phoenix-sekur-logo.png',
+  '/apple-touch-icon.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/favicon-32.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

@@ -133,7 +133,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
       <div className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <img
-            src="https://media.base44.com/images/public/69ebeeab8b7d7f109e7d5a6c/455c5c3f4_F4CA4781-90C4-416F-ADD8-E17BD4990AE2.PNG"
+            src="/phoenix-sekur-logo.png"
             alt="Phoenix Sekur"
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-contain bg-black shrink-0"
           />

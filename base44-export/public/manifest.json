@@ -1,19 +1,37 @@
 {
   "name": "Phoenix Sekur",
-  "short_name": "Phoenix",
+  "short_name": "Phoenix Sekur",
   "description": "Application agents — planning, rondes, PTI, main courante",
   "start_url": "/espace-agent",
   "display": "standalone",
-  "background_color": "#09090b",
+  "background_color": "#000000",
   "theme_color": "#c0392b",
   "orientation": "portrait-primary",
   "lang": "fr",
   "icons": [
     {
-      "src": "/phoenix-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
