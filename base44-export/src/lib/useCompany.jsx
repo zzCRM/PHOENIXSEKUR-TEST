@@ -23,7 +23,7 @@ export function useCompany() {
         setUser(u);
         // Admin = propriétaire de la société, son ID est le company_id
         // Agent/Client non-admin = company_id stocké sur son profil
-        const cid = u.role === 'admin' ? u.id : (u.company_id || u.id);
+        const cid = u.company_id || u.companyId || (u.role === 'admin' ? u.id : null);
         setCompanyId(cid);
         setIsAdmin(u.role === 'admin');
       }

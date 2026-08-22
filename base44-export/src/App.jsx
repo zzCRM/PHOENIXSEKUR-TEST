@@ -36,6 +36,7 @@ import PointsControle from '@/pages/PointsControle';
 import HeuresCollaborateurs from '@/pages/HeuresCollaborateurs';
 import RapportsPDF from '@/pages/RapportsPDF';
 import Leads from '@/pages/Leads';
+import Login from '@/pages/Login';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -99,7 +100,10 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthenticatedApp />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/*" element={<AuthenticatedApp />} />
+          </Routes>
         </Router>
         <Toaster />
       </QueryClientProvider>
