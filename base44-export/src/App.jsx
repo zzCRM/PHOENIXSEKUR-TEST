@@ -37,6 +37,7 @@ import HeuresCollaborateurs from '@/pages/HeuresCollaborateurs';
 import RapportsPDF from '@/pages/RapportsPDF';
 import Leads from '@/pages/Leads';
 import Login from '@/pages/Login';
+import AcceptInvitation from '@/pages/AcceptInvitation';
 import SuperAdmin from '@/pages/SuperAdmin';
 
 const AuthenticatedApp = () => {
@@ -104,6 +105,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/invitation/:token" element={<AcceptInvitation />} />
             <Route path="/*" element={<AuthenticatedApp />} />
           </Routes>
         </Router>

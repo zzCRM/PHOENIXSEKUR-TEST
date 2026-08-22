@@ -25,6 +25,22 @@ model User {
   @@map("users")
 }
 
+model Invitation {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  email      String
+  role       String    @default("user")
+  companyId  String    @map("company_id")
+  invitedBy  String?   @map("invited_by")
+  expiresAt  DateTime  @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("invitations")
+}
+
 // ─── Entity tables (mirrors Base44 entities) ───────────────────────────────
 // Each row stores scalar index fields + JSON payload for full Base44 compatibility.
 

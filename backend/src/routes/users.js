@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
+import { isSuperAdmin } from '../lib/superadmin.js';
+import { createAndSendInvitation, roleLabel } from '../lib/invitations.js';
 
 const router = Router();
 
-import { isSuperAdmin } from '../lib/superadmin.js';
-
-// Remplace base44.users.inviteUser
+// Remplace base44.users.inviteUser — envoie un email avec lien de création de compte
 router.post('/invite', requireAuth, async (req, res) => {
   try {
     const { email, role = 'user' } = req.body;
@@ -22,39 +21,39 @@ router.post('/invite', requireAuth, async (req, res) => {
     }
     const companyId = req.body.company_id || req.user.companyId;
     const appRole = role === 'admin' ? 'admin' : 'user';
+    const normalizedEmail = email.trim().toLowerCase();
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return res.json({
         success: true,
         message: 'Utilisateur déjà enregistré',
-        email,
+        email: normalizedEmail,
+        email_sent: false,
         temporary_password: null,
       });
     }
 
-    // Mot de passe temporaire — l'utilisateur pourra le changer
-    const temporaryPassword = randomBytes(4).toString('hex') + 'A1!';
-    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
-
-    await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        companyId,
-        role: appRole,
-      },
+    const { inviteUrl, emailSent, emailReason } = await createAndSendInvitation({
+      email: normalizedEmail,
+      role: appRole,
+      companyId,
+      invitedBy: req.user.email,
     });
 
-    // TODO Phase 5: envoi email d'invitation via SendGrid/SES
-    console.log(`[invite] ${email} → mot de passe temporaire: ${temporaryPassword}`);
+    const message = emailSent
+      ? `Invitation envoyée par email à ${normalizedEmail}`
+      : `Invitation créée pour ${normalizedEmail}. Configurez SMTP pour l'envoi automatique (lien dans les logs serveur).`;
 
     res.json({
       success: true,
-      email,
+      email: normalizedEmail,
       role: appRole,
-      temporary_password: temporaryPassword,
-      message: 'Utilisateur créé. Communiquez-lui son mot de passe temporaire.',
+      role_label: roleLabel(appRole),
+      email_sent: emailSent,
+      invite_url: emailSent ? undefined : inviteUrl,
+      email_reason: emailReason,
+      message,
     });
   } catch (err) {
     console.error('Invite error:', err);

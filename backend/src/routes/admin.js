@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
+import { createAndSendInvitation } from '../lib/invitations.js';
 
 const router = Router();
 
@@ -50,21 +50,42 @@ router.post('/users', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email requis' });
 
   const companyId = company_id || process.env.ADMIN_COMPANY_ID || '69edb44339460eb505c2a699';
-  const plainPassword = password || randomBytes(4).toString('hex') + 'A1!';
-  const passwordHash = await bcrypt.hash(plainPassword, 12);
+  const normalizedEmail = email.trim().toLowerCase();
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {
     return res.status(409).json({ error: 'Cet email existe déjà' });
   }
 
+  if (!password) {
+    const { inviteUrl, emailSent } = await createAndSendInvitation({
+      email: normalizedEmail,
+      role,
+      companyId,
+      invitedBy: req.user.email,
+    });
+
+    return res.status(201).json({
+      email: normalizedEmail,
+      role,
+      company_id: companyId,
+      email_sent: emailSent,
+      invite_url: emailSent ? undefined : inviteUrl,
+      message: emailSent
+        ? `Invitation envoyée par email à ${normalizedEmail}`
+        : `Invitation créée. Configurez SMTP ou transmettez le lien manuellement.`,
+    });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
   const user = await prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       passwordHash,
       role,
       companyId,
-      firstName: first_name || email.split('@')[0],
+      firstName: first_name || normalizedEmail.split('@')[0],
       lastName: last_name || '',
     },
   });
@@ -74,7 +95,7 @@ router.post('/users', async (req, res) => {
     email: user.email,
     role: user.role,
     company_id: user.companyId,
-    temporary_password: plainPassword,
+    temporary_password: password,
     message: 'Utilisateur créé. Communiquez-lui son mot de passe.',
   });
 });

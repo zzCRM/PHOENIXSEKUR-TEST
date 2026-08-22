@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
+import { getValidInvitation, roleLabel } from '../lib/invitations.js';
 
 const router = Router();
 
@@ -58,6 +59,88 @@ router.get('/me', requireAuth, async (req, res) => {
     last_name: user.lastName,
     superadmin,
   });
+});
+
+router.get('/invitation/:token', async (req, res) => {
+  try {
+    const invitation = await getValidInvitation(req.params.token);
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation invalide ou expirée' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: invitation.email } });
+    if (existing) {
+      return res.status(409).json({ error: 'Un compte existe déjà pour cet email' });
+    }
+
+    res.json({
+      email: invitation.email,
+      role: invitation.role,
+      role_label: roleLabel(invitation.role),
+      expires_at: invitation.expiresAt,
+    });
+  } catch (err) {
+    console.error('Invitation lookup error:', err);
+    res.status(500).json({ error: 'Impossible de vérifier l\'invitation' });
+  }
+});
+
+router.post('/accept-invitation', async (req, res) => {
+  try {
+    const { token, password, first_name, last_name } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token et mot de passe requis' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères' });
+    }
+
+    const invitation = await getValidInvitation(token);
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation invalide ou expirée' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email: invitation.email } });
+    if (existing) {
+      return res.status(409).json({ error: 'Un compte existe déjà pour cet email' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: {
+        email: invitation.email,
+        passwordHash,
+        companyId: invitation.companyId,
+        role: invitation.role,
+        firstName: first_name || invitation.email.split('@')[0],
+        lastName: last_name || '',
+      },
+    });
+
+    await prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { acceptedAt: new Date() },
+    });
+
+    const accessToken = signToken(user);
+    const superadmin = isSuperAdmin({ email: user.email, role: user.role });
+
+    res.status(201).json({
+      access_token: accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        company_id: user.companyId,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        superadmin,
+      },
+    });
+  } catch (err) {
+    console.error('Accept invitation error:', err);
+    res.status(500).json({ error: 'Création du compte impossible' });
+  }
 });
 
 router.post('/register', async (req, res) => {

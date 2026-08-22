@@ -31,6 +31,13 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_COMPANY_ID: ${ADMIN_COMPANY_ID:-69edb44339460eb505c2a699}
+      DOMAIN: ${DOMAIN}
+      APP_URL: https://${DOMAIN}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - uploads_data:/app/uploads
       - ./base44-export/data/exports:/imports:ro

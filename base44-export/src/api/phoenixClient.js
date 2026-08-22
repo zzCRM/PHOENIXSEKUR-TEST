@@ -132,6 +132,19 @@ export const phoenix = {
       return { ...result, user: { ...result.user, superadmin: me.superadmin } };
     },
 
+    async getInvitation(token) {
+      return apiFetch(`/auth/invitation/${token}`);
+    },
+
+    async acceptInvitation({ token, password, first_name, last_name }) {
+      const result = await apiFetch('/auth/accept-invitation', {
+        method: 'POST',
+        body: JSON.stringify({ token, password, first_name, last_name }),
+      });
+      if (result.access_token) setToken(result.access_token);
+      return result;
+    },
+
     logout(redirectUrl) {
       clearToken();
       if (redirectUrl) window.location.href = '/login';
