@@ -118,9 +118,19 @@ export function sortRecords(records, sort) {
   const field = desc ? sort.slice(1) : sort;
 
   return [...records].sort((a, b) => {
-    const av = a[field] ?? '';
-    const bv = b[field] ?? '';
-    if (av === bv) return 0;
+    let av = a[field];
+    let bv = b[field];
+    // Fallback aliases
+    if (field === 'created_date') {
+      av = a.created_date ?? a.createdAt;
+      bv = b.created_date ?? b.createdAt;
+    }
+    if (av == null && bv == null) return 0;
+    if (av == null) return desc ? 1 : -1;
+    if (bv == null) return desc ? -1 : 1;
+    if (typeof av === 'number' && typeof bv === 'number') {
+      return desc ? bv - av : av - bv;
+    }
     const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
     return desc ? -cmp : cmp;
   });

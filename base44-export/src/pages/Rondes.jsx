@@ -40,7 +40,7 @@ export default function Rondes() {
   }, [rondes]);
 
   const createMut = useMutation({
-    mutationFn: (data) => base44.entities.Ronde.create(data),
+    mutationFn: (data) => base44.entities.Ronde.create({ ...data, company_id: companyId }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['rondes'] }); setShowForm(false); toast.success('Ronde créée avec succès'); },
     onError: (error) => { toast.error('Échec de la création : ' + (error.message || 'Erreur inconnue')); },
   });
