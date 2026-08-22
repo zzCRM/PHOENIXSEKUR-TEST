@@ -12,6 +12,7 @@ import publicRoutes from './routes/public.js';
 import reportRoutes from './routes/reports.js';
 import { authMiddleware } from './middleware/auth.js';
 import { startReportScheduler } from './lib/report-scheduler.js';
+import { getSmtpStatus } from './lib/email.js';
 
 dotenv.config();
 
@@ -71,5 +72,11 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`Phoenix Sekur API running on http://localhost:${PORT}`);
+  const smtp = getSmtpStatus();
+  console.log(
+    smtp.configured
+      ? `[email] SMTP prêt (${smtp.host}:${smtp.port} as ${smtp.user})`
+      : '[email] SMTP non configuré — les invitations ne partiront pas par email',
+  );
   startReportScheduler();
 });

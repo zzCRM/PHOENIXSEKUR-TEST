@@ -38,8 +38,12 @@ jobs:
             sudo git pull
             if [ -n "$SMTP_PASS" ]; then
               sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
-                SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" \
+                SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" APP_URL="https://app.phoenixsekur.com" \
                 bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production
+            else
+              echo "⚠️ SMTP_PASS secret manquant — les invitations ne partiront pas par email"
+              sudo APP_URL="https://app.phoenixsekur.com" \
+                bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production || true
             fi
             sudo bash scripts/ensure-vitrine-env.sh /opt/phoenixsekur/.env.production || true
             sudo bash scripts/ensure-superadmin-env.sh /opt/phoenixsekur/.env.production || true

@@ -32,15 +32,16 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_COMPANY_ID: ${ADMIN_COMPANY_ID:-69edb44339460eb505c2a699}
       DOMAIN: ${DOMAIN}
-      APP_URL: https://${DOMAIN}
+      APP_URL: ${APP_URL:-https://${DOMAIN}}
       VITRINE_DOMAIN: ${VITRINE_DOMAIN:-www.phoenixsekur.com}
-      VITRINE_URL: ${VITRINE_URL:-https://www.phoenixsekur.com}
+      VITRINE_URL: ${VITRINE_URL:-https://${VITRINE_DOMAIN:-www.phoenixsekur.com}}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.phoenixsekur.com}
       COMPANY_ADMIN_EMAILS: ${COMPANY_ADMIN_EMAILS:-serviceclient@ppsecurity.fr,contact@ppsecurity.fr}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_PASS: ${SMTP_PASS:-${SMTP_PASSWORD:-}}
+      SMTP_PASSWORD: ${SMTP_PASS:-${SMTP_PASSWORD:-}}
       SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - uploads_data:/app/uploads

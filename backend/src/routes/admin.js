@@ -70,13 +70,18 @@ router.post('/users', async (req, res) => {
   if (existing) return res.status(409).json({ error: 'Cet email existe déjà' });
 
   if (!password) {
-    const { inviteUrl, emailSent } = await createAndSendInvitation({
+    const { inviteUrl, emailSent, emailReason, emailError } = await createAndSendInvitation({
       email: normalizedEmail, role, companyId, invitedBy: req.user.email,
     });
     return res.status(201).json({
       email: normalizedEmail, role, company_id: companyId,
-      email_sent: emailSent, invite_url: emailSent ? undefined : inviteUrl,
-      message: emailSent ? `Invitation envoyée à ${normalizedEmail}` : 'Invitation créée',
+      email_sent: emailSent,
+      email_reason: emailReason || null,
+      email_error: emailError || null,
+      invite_url: inviteUrl,
+      message: emailSent
+        ? `Invitation envoyée à ${normalizedEmail}`
+        : `Invitation créée — email non envoyé (${emailReason || 'smtp'}). Copiez le lien.`,
     });
   }
 

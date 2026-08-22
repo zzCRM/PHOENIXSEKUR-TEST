@@ -2,29 +2,53 @@ import nodemailer from 'nodemailer';
 import { getPlatformSettings, renderTemplate } from './platform-settings.js';
 
 let transporter;
+let transporterKey = '';
+
+function smtpConfig() {
+  const host = process.env.SMTP_HOST || process.env.SMTP_SERVER || '';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER || process.env.SMTP_USERNAME || '';
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '';
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER || user;
+  return { host, port, user, pass, from };
+}
 
 function getTransporter() {
-  if (transporter) return transporter;
-
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
+  const { host, port, user, pass } = smtpConfig();
   if (!host || !user || !pass) return null;
+
+  const key = `${host}:${port}:${user}:${pass.length}`;
+  if (transporter && transporterKey === key) return transporter;
 
   transporter = nodemailer.createTransport({
     host,
     port,
     secure: port === 465,
+    requireTLS: port === 587,
     auth: { user, pass },
+    tls: { minVersion: 'TLSv1.2' },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   });
-
+  transporterKey = key;
   return transporter;
 }
 
 export function isEmailConfigured() {
-  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const { host, user, pass } = smtpConfig();
+  return !!(host && user && pass);
+}
+
+export function getSmtpStatus() {
+  const { host, port, user, from } = smtpConfig();
+  return {
+    configured: isEmailConfigured(),
+    host: host || null,
+    port,
+    user: user || null,
+    from: from || null,
+  };
 }
 
 export function getAppUrl() {
@@ -50,41 +74,79 @@ function invitationVars({ inviteUrl, invitedByEmail, roleLabel, companyName }) {
 
 export async function sendInvitationEmail({ to, inviteUrl, invitedByEmail, roleLabel, companyName }) {
   const settings = await getPlatformSettings();
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const { from, user } = smtpConfig();
   const vars = invitationVars({ inviteUrl, invitedByEmail, roleLabel, companyName });
 
-  const subject = renderTemplate(settings.invitation_subject, vars);
-  const text = renderTemplate(settings.invitation_body_text, vars);
-  const html = renderTemplate(settings.invitation_body_html, vars);
+  const subjectTpl = settings.invitation_subject
+    || settings.invite_subject
+    || 'Invitation à rejoindre Phoenix Sekur';
+  const textTpl = settings.invitation_body_text
+    || settings.invite_body_text
+    || `Bonjour,\n\n{{invited_by_line}}\n\nCréez votre compte :\n{{invite_url}}\n\nCe lien expire dans 7 jours.`;
+  const htmlTpl = settings.invitation_body_html
+    || settings.invite_body_html
+    || `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
+  <h2 style="color:#c0392b">Phoenix Sekur</h2>
+  <p>Bonjour,</p>
+  <p>{{invited_by_line}}</p>
+  <p style="margin:28px 0">
+    <a href="{{invite_url}}" style="background:#c0392b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
+      Créer mon compte
+    </a>
+  </p>
+  <p style="font-size:13px;color:#666">Ou copiez ce lien :<br><a href="{{invite_url}}">{{invite_url}}</a></p>
+</div>`;
+
+  const subject = renderTemplate(subjectTpl, vars);
+  const text = renderTemplate(textTpl, vars);
+  const html = renderTemplate(htmlTpl, vars);
 
   const transport = getTransporter();
   if (!transport) {
-    console.log(`[email] SMTP non configuré — invitation pour ${to}: ${inviteUrl}`);
-    return { sent: false, reason: 'smtp_not_configured' };
+    console.error(`[email] SMTP non configuré — invitation ${to}: ${inviteUrl}`);
+    return { sent: false, reason: 'smtp_not_configured', inviteUrl };
   }
 
-  await transport.sendMail({ from, to, subject, text, html });
-  console.log(`[email] Invitation envoyée à ${to}`);
-  return { sent: true };
+  try {
+    const info = await transport.sendMail({
+      from: from || user,
+      to,
+      subject,
+      text,
+      html,
+    });
+    console.log(`[email] Invitation envoyée à ${to} (id=${info.messageId})`);
+    return { sent: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[email] Échec envoi invitation à ${to}:`, err.message);
+    transporter = null;
+    transporterKey = '';
+    return {
+      sent: false,
+      reason: 'smtp_error',
+      error: err.message,
+      inviteUrl,
+    };
+  }
 }
 
 export async function sendSignupNotifyEmail({ signupRequest }) {
   const settings = await getPlatformSettings();
-  const notifyList = (settings.signup_notify_emails || '')
+  const notifyList = (settings.signup_notify_emails || settings.signup_notify_emails || '')
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean);
 
   if (notifyList.length === 0) return { sent: false, reason: 'no_notify_emails' };
 
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const { from, user } = smtpConfig();
   const appUrl = getAppUrl();
   const subject = `[Phoenix Sekur] Nouvelle demande d'inscription — ${signupRequest.companyName || signupRequest.email}`;
   const text = [
     'Nouvelle demande d\'inscription depuis le site vitrine :',
     '',
     `Société : ${signupRequest.companyName || '—'}`,
-    `Contact : ${signupRequest.firstName || ''} ${signupRequest.lastName || ''}`.trim(),
+    `Contact : ${`${signupRequest.firstName || ''} ${signupRequest.lastName || ''}`.trim()}`,
     `Email : ${signupRequest.email}`,
     `Téléphone : ${signupRequest.phone || '—'}`,
     `Message : ${signupRequest.message || '—'}`,
@@ -98,14 +160,21 @@ export async function sendSignupNotifyEmail({ signupRequest }) {
     return { sent: false, reason: 'smtp_not_configured' };
   }
 
-  for (const to of notifyList) {
-    await transport.sendMail({ from, to, subject, text });
+  try {
+    for (const to of notifyList) {
+      await transport.sendMail({ from: from || user, to, subject, text });
+    }
+    return { sent: true };
+  } catch (err) {
+    console.error('[email] Signup notify failed:', err.message);
+    transporter = null;
+    transporterKey = '';
+    return { sent: false, reason: 'smtp_error', error: err.message };
   }
-  return { sent: true };
 }
 
 export async function sendPasswordResetEmail({ to, resetUrl }) {
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const { from, user } = smtpConfig();
   const subject = 'Réinitialisation de votre mot de passe — Phoenix Sekur';
   const text = [
     'Bonjour,',
@@ -127,9 +196,16 @@ export async function sendPasswordResetEmail({ to, resetUrl }) {
   const transport = getTransporter();
   if (!transport) {
     console.log(`[email] Reset password pour ${to}: ${resetUrl}`);
-    return { sent: false, reason: 'smtp_not_configured' };
+    return { sent: false, reason: 'smtp_not_configured', resetUrl };
   }
 
-  await transport.sendMail({ from, to, subject, text, html });
-  return { sent: true };
+  try {
+    await transport.sendMail({ from: from || user, to, subject, text, html });
+    return { sent: true };
+  } catch (err) {
+    console.error(`[email] Reset failed for ${to}:`, err.message);
+    transporter = null;
+    transporterKey = '';
+    return { sent: false, reason: 'smtp_error', error: err.message, resetUrl };
+  }
 }

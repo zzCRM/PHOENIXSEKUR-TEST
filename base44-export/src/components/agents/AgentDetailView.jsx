@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X, User, Briefcase, MapPin, Image as ImageIcon, Shield,
-  Star, AlertTriangle, FileText, Package, Euro, Clock, CheckCircle2, Mail
+  Star, AlertTriangle, FileText, Package, Euro, Clock, CheckCircle2, Mail, Copy
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,8 @@ export default function AgentDetailView({ agent, onClose }) {
   const [photoFile, setPhotoFile] = useState(null);
   const [inviting, setInviting] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
+  const [inviteEmailSent, setInviteEmailSent] = useState(false);
+  const [inviteLink, setInviteLink] = useState(null);
   const qc = useQueryClient();
 
   const updateMut = useMutation({
@@ -91,9 +93,17 @@ export default function AgentDetailView({ agent, onClose }) {
     setInviting(true);
     try {
       const appRole = (formData.role === 'admin' || formData.role === 'superviseur') ? 'admin' : 'user';
-      await base44.users.inviteUser(email, appRole);
+      const result = await base44.users.inviteUser(email, appRole);
       setInviteSent(true);
-      toast.success(`Invitation envoyée à ${email}`);
+      setInviteEmailSent(!!result.email_sent);
+      setInviteLink(result.invite_url || null);
+      if (result.email_sent) {
+        toast.success(`Invitation envoyée par email à ${email}`);
+      } else if (result.invite_url) {
+        toast.warning('Email non envoyé — copiez le lien ci-dessous');
+      } else {
+        toast.success(result.message || `Invitation créée pour ${email}`);
+      }
     } catch (err) {
       toast.error('Erreur invitation : ' + err.message);
     }
@@ -375,9 +385,33 @@ export default function AgentDetailView({ agent, onClose }) {
                 Email : <strong>{formData.email || <span className="text-destructive">Non renseigné</span>}</strong>
               </div>
               {inviteSent ? (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <p className="text-sm font-medium">Invitation envoyée !</p>
+                <div className={`space-y-2 p-3 rounded-xl border ${inviteEmailSent ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                  <div className="flex items-center gap-2">
+                    {inviteEmailSent ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                    <p className="text-sm font-medium">
+                      {inviteEmailSent ? 'Invitation envoyée par email' : 'Invitation créée — email non envoyé'}
+                    </p>
+                  </div>
+                  {inviteLink && (
+                    <div className="flex gap-2">
+                      <Input readOnly value={inviteLink} className="text-xs bg-white/80" />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(inviteLink);
+                            toast.success('Lien copié');
+                          } catch {
+                            toast.error('Impossible de copier');
+                          }
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <Button className="w-full gap-2" onClick={handleInvite} disabled={inviting || !formData.email}>

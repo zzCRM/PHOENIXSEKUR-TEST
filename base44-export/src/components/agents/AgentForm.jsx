@@ -86,9 +86,16 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
     setInviting(true);
     try {
       const appRole = (agentRole === 'admin' || agentRole === 'superviseur') ? 'admin' : 'user';
-      await base44.users.inviteUser(email, appRole);
+      const result = await base44.users.inviteUser(email, appRole);
       setInviteSent(true);
-      toast.success(`Invitation envoyée à ${email}`);
+      if (result.email_sent) {
+        toast.success(`Invitation envoyée par email à ${email}`);
+      } else if (result.invite_url) {
+        toast.warning('Email non envoyé — lien à copier');
+        try { await navigator.clipboard.writeText(result.invite_url); toast.message('Lien d\'invitation copié'); } catch { /* ignore */ }
+      } else {
+        toast.success(result.message || `Invitation créée pour ${email}`);
+      }
     } catch (err) {
       toast.error("Erreur lors de l'invitation : " + (err.message || 'Erreur inconnue'));
     }

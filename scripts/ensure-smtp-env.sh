@@ -20,8 +20,9 @@ keys = {
     "SMTP_HOST": os.environ.get("SMTP_HOST", "smtp.ionos.fr"),
     "SMTP_PORT": os.environ.get("SMTP_PORT", "587"),
     "SMTP_USER": os.environ.get("SMTP_USER", "contact@phoenixsekur.com"),
-    "SMTP_PASS": os.environ.get("SMTP_PASS", ""),
+    "SMTP_PASS": os.environ.get("SMTP_PASS") or os.environ.get("SMTP_PASSWORD", ""),
     "SMTP_FROM": os.environ.get("SMTP_FROM", "Phoenix Sekur <contact@phoenixsekur.com>"),
+    "APP_URL": os.environ.get("APP_URL", "https://app.phoenixsekur.com"),
 }
 
 content = open(path, encoding="utf-8").read()
