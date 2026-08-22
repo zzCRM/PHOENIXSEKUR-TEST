@@ -1,0 +1,175 @@
+{
+  "name": "Client",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "description": "ID de la soci\u00e9t\u00e9 de s\u00e9curit\u00e9"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "Logo du client (URL du fichier t\u00e9l\u00e9vers\u00e9)"
+    },
+    "contact_name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "actif",
+        "inactif",
+        "prospect"
+      ],
+      "default": "actif"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID utilisateur du portail client"
+    },
+    "legal_form": {
+      "type": "string"
+    },
+    "siret": {
+      "type": "string"
+    },
+    "tva_number": {
+      "type": "string"
+    },
+    "siren": {
+      "type": "string"
+    },
+    "director_name": {
+      "type": "string"
+    },
+    "comptes_clients": {
+      "type": "array",
+      "description": "Liste des comptes portail clients",
+      "items": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "admin"
+            ],
+            "default": "user"
+          },
+          "invite_sent": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "tarification": {
+      "type": "object",
+      "description": "Taux de facturation et majorations d\u00e9finis par le client (en pourcentage)",
+      "properties": {
+        "taux_horaire_base": {
+          "type": "number",
+          "description": "Taux horaire de base HT (\u20ac/h) n\u00e9goci\u00e9 avec le client"
+        },
+        "majoration_nuit": {
+          "type": "number",
+          "default": 0,
+          "description": "Majoration nuit (21h-06h) en % appliqu\u00e9e sur le taux de base"
+        },
+        "majoration_dimanche": {
+          "type": "number",
+          "default": 0,
+          "description": "Majoration dimanche en % appliqu\u00e9e sur le taux de base"
+        },
+        "majoration_ferie": {
+          "type": "number",
+          "default": 0,
+          "description": "Majoration jours f\u00e9ri\u00e9s en % appliqu\u00e9e sur le taux de base"
+        }
+      }
+    },
+    "portal_perms": {
+      "type": "object",
+      "description": "Droits d'acc\u00e8s au portail client par module",
+      "properties": {
+        "access_planning": {
+          "type": "boolean",
+          "default": true
+        },
+        "access_documents": {
+          "type": "boolean",
+          "default": true
+        },
+        "access_factures": {
+          "type": "boolean",
+          "default": false
+        },
+        "access_main_courante": {
+          "type": "boolean",
+          "default": true
+        },
+        "access_rapports_rondes": {
+          "type": "boolean",
+          "default": true
+        },
+        "access_rapports_mission": {
+          "type": "boolean",
+          "default": true
+        },
+        "access_cahier_consignes": {
+          "type": "boolean",
+          "default": false
+        },
+        "notif_rapport_rondes": {
+          "type": "boolean",
+          "default": false
+        },
+        "notif_main_courante": {
+          "type": "boolean",
+          "default": false
+        },
+        "notif_rapport_auto": {
+          "type": "boolean",
+          "default": false
+        },
+        "notif_documents": {
+          "type": "boolean",
+          "default": true
+        },
+        "sites_accessibles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "company_name",
+    "company_id"
+  ]
+}

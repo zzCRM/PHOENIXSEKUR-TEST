@@ -1,0 +1,54 @@
+{
+  "name": "Document",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "contrat",
+        "procedure",
+        "rapport",
+        "fiche_paie",
+        "autre"
+      ],
+      "default": "autre"
+    },
+    "file_url": {
+      "type": "string"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "client",
+        "agent",
+        "tous"
+      ],
+      "default": "tous"
+    },
+    "target_id": {
+      "type": "string",
+      "description": "ID du client ou agent cibl\u00e9"
+    },
+    "target_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "company_id",
+    "name",
+    "file_url"
+  ]
+}

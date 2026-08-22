@@ -1,0 +1,90 @@
+{
+  "name": "Lead",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "company_name": {
+      "type": "string"
+    },
+    "contact_name": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "appel_entrant",
+        "email",
+        "site_web",
+        "recommandation",
+        "prospection",
+        "autre"
+      ],
+      "default": "appel_entrant"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "nouveau",
+        "contacte",
+        "qualification",
+        "proposition",
+        "negociation",
+        "gagne",
+        "perdu"
+      ],
+      "default": "nouveau"
+    },
+    "valeur_estimee": {
+      "type": "number"
+    },
+    "probabilite": {
+      "type": "number",
+      "description": "Probabilit\u00e9 de conversion en %"
+    },
+    "assigned_to": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "date_rappel": {
+      "type": "string",
+      "format": "date"
+    },
+    "type_service": {
+      "type": "string",
+      "enum": [
+        "gardiennage",
+        "surveillance",
+        "intervention",
+        "ronde",
+        "evenementiel",
+        "autre"
+      ]
+    },
+    "nb_heures_prevues": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "company_name",
+    "company_id"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "PostePlanning",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "label": {
+      "type": "string"
+    },
+    "start_time": {
+      "type": "string"
+    },
+    "end_time": {
+      "type": "string"
+    },
+    "duration_hours": {
+      "type": "number"
+    },
+    "qualification": {
+      "type": "string"
+    },
+    "agents_required": {
+      "type": "number",
+      "default": 1
+    },
+    "color": {
+      "type": "string",
+      "default": "#22c55e"
+    }
+  },
+  "required": [
+    "site_id",
+    "start_time",
+    "end_time",
+    "company_id"
+  ]
+}

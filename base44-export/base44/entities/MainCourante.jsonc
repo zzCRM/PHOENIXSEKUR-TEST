@@ -1,0 +1,112 @@
+{
+  "name": "MainCourante",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "mission_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "time": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "service",
+        "tournee",
+        "pause",
+        "ronde",
+        "point_controle",
+        "collaborateur",
+        "incident",
+        "controle",
+        "logistique",
+        "soin_secours",
+        "presence",
+        "autre"
+      ],
+      "default": "autre",
+      "description": "Cat\u00e9gorie d'\u00e9v\u00e9nement de main courante"
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Type pr\u00e9cis d'\u00e9v\u00e9nement (cl\u00e9 du catalogue mainCouranteEvents)"
+    },
+    "auto": {
+      "type": "boolean",
+      "default": false,
+      "description": "True si g\u00e9n\u00e9r\u00e9 automatiquement (prise de service, ronde, point de contr\u00f4le)"
+    },
+    "source_ref": {
+      "type": "string",
+      "description": "R\u00e9f\u00e9rence de l'entit\u00e9 source (prise_service_id, ronde_execution_id)"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "arrivee",
+        "depart",
+        "incident",
+        "ronde",
+        "observation",
+        "pti_alerte",
+        "pti_ok",
+        "autre"
+      ],
+      "default": "observation",
+      "description": "Type legacy (compatibilit\u00e9 ant\u00e9rieure)"
+    },
+    "content": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "attention",
+        "urgent"
+      ],
+      "default": "normal"
+    },
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "sent_to_client": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "site_id",
+    "date",
+    "content",
+    "company_id"
+  ]
+}

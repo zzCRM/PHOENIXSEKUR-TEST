@@ -1,0 +1,74 @@
+{
+  "name": "Invoice",
+  "type": "object",
+  "properties": {
+    "invoice_number": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "total_ht": {
+      "type": "number"
+    },
+    "tva_rate": {
+      "type": "number",
+      "default": 20
+    },
+    "total_tva": {
+      "type": "number"
+    },
+    "total_ttc": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "brouillon",
+        "envoyee",
+        "payee",
+        "en_retard",
+        "annulee"
+      ],
+      "default": "brouillon"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "invoice_number",
+    "client_name"
+  ]
+}

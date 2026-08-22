@@ -1,0 +1,86 @@
+{
+  "name": "BonIntervention",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "numero": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "mission_id": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "heure_debut": {
+      "type": "string"
+    },
+    "heure_fin": {
+      "type": "string"
+    },
+    "type_intervention": {
+      "type": "string",
+      "enum": [
+        "gardiennage",
+        "ronde",
+        "intervention",
+        "evenementiel",
+        "autre"
+      ],
+      "default": "gardiennage"
+    },
+    "description": {
+      "type": "string"
+    },
+    "observations": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "termine",
+        "signe"
+      ],
+      "default": "en_cours"
+    },
+    "signature_client": {
+      "type": "boolean",
+      "default": false
+    },
+    "signature_at": {
+      "type": "string"
+    },
+    "envoye_client": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "company_id",
+    "client_name",
+    "date",
+    "type_intervention"
+  ]
+}

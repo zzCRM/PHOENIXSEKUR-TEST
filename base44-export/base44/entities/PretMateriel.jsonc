@@ -1,0 +1,53 @@
+{
+  "name": "PretMateriel",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "materiel": {
+      "type": "string",
+      "description": "Nom/description du mat\u00e9riel"
+    },
+    "quantite": {
+      "type": "number",
+      "default": 1
+    },
+    "date_pret": {
+      "type": "string",
+      "format": "date"
+    },
+    "date_retour_prevue": {
+      "type": "string",
+      "format": "date"
+    },
+    "date_retour_effective": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "en_cours",
+        "rendu",
+        "perdu"
+      ],
+      "default": "en_cours"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "agent_id",
+    "materiel",
+    "date_pret"
+  ]
+}

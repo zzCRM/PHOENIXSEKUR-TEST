@@ -1,0 +1,56 @@
+{
+  "name": "CahierConsignes",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenu des consignes (texte riche)"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "general",
+        "securite",
+        "urgence",
+        "acces",
+        "procedures",
+        "contacts"
+      ],
+      "default": "general"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "normale",
+        "importante",
+        "critique"
+      ],
+      "default": "normale"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "updated_by": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_id",
+    "site_id",
+    "title",
+    "content"
+  ]
+}

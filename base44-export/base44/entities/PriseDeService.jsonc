@@ -1,0 +1,95 @@
+{
+  "name": "PriseDeService",
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "string"
+    },
+    "agent_id": {
+      "type": "string"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "mission_id": {
+      "type": "string"
+    },
+    "site_id": {
+      "type": "string"
+    },
+    "site_name": {
+      "type": "string"
+    },
+    "client_name": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "planned_start": {
+      "type": "string"
+    },
+    "planned_end": {
+      "type": "string"
+    },
+    "actual_start": {
+      "type": "string"
+    },
+    "actual_end": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planifie",
+        "en_service",
+        "termine"
+      ],
+      "default": "planifie"
+    },
+    "start_photo_url": {
+      "type": "string",
+      "description": "Photo de prise de service"
+    },
+    "end_photo_url": {
+      "type": "string",
+      "description": "Photo de fin de service"
+    },
+    "start_latitude": {
+      "type": "number"
+    },
+    "start_longitude": {
+      "type": "number"
+    },
+    "end_latitude": {
+      "type": "number"
+    },
+    "end_longitude": {
+      "type": "number"
+    },
+    "nfc_validated": {
+      "type": "boolean",
+      "default": false
+    },
+    "nfc_tag_id": {
+      "type": "string"
+    },
+    "pti_active": {
+      "type": "boolean",
+      "default": false
+    },
+    "pti_last_check": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "date",
+    "site_id",
+    "company_id"
+  ]
+}
