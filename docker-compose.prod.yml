@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: phoenixsekur-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: phoenix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: phoenixsekur
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phoenix -d phoenixsekur"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: phoenixsekur-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://phoenix:${POSTGRES_PASSWORD}@postgres:5432/phoenixsekur
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3001
+      CORS_ORIGIN: https://${DOMAIN}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_COMPANY_ID: ${ADMIN_COMPANY_ID:-69edb44339460eb505c2a699}
+    volumes:
+      - uploads_data:/app/uploads
+      - ./base44-export/data/exports:/imports:ro
+    command: >
+      sh -c "npx prisma db push &&
+             node scripts/seed-admin.js 2>/dev/null || true &&
+             node src/index.js"
+
+  frontend:
+    build:
+      context: ./base44-export
+      dockerfile: Dockerfile
+    container_name: phoenixsekur-web
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: phoenixsekur-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:
