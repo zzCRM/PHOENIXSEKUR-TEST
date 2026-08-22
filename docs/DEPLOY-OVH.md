@@ -154,6 +154,34 @@ Une fois la prod OVH validée (1–2 semaines de test parallèle) :
 
 ---
 
+## Invitations par email (SMTP)
+
+Quand un administrateur invite un utilisateur, Phoenix Sekur envoie un email avec un lien du type :
+
+`https://app.phoenixsekur.com/invitation/xxxxx`
+
+L'invité clique, choisit son mot de passe, et son compte est créé.
+
+Ajoutez ces variables dans `/opt/phoenixsekur/.env.production` :
+
+```env
+SMTP_HOST=ssl0.ovh.net
+SMTP_PORT=465
+SMTP_USER=noreply@votredomaine.fr
+SMTP_PASS=mot-de-passe-boite-mail
+SMTP_FROM=Phoenix Sekur <noreply@votredomaine.fr>
+```
+
+Puis redéployez :
+
+```bash
+cd /opt/phoenixsekur && sudo bash scripts/deploy-ovh.sh
+```
+
+Sans SMTP configuré, l'invitation est créée mais le lien s'affiche dans l'interface admin (à transmettre manuellement).
+
+---
+
 ## Support
 
 - Logs backend : `docker compose -f docker-compose.prod.yml logs backend`
