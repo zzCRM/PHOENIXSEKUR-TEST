@@ -20,10 +20,10 @@ jobs:
           command_timeout: 20m
           script: |
             set -e
-            git config --global --add safe.directory /opt/phoenixsekur
+            sudo git config --global --add safe.directory /opt/phoenixsekur
             cd /opt/phoenixsekur
-            git fetch origin
-            git checkout cursor/migrate-off-base44-6bc2 || git checkout main
-            git pull
-            docker compose -f docker-compose.prod.yml up -d --build
+            sudo git fetch origin
+            sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
+            sudo git pull
+            sudo docker compose -f docker-compose.prod.yml up -d --build
             echo "✅ Déployé $(date)"
