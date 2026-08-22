@@ -25,5 +25,5 @@ jobs:
             sudo git fetch origin
             sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
             sudo git pull
-            sudo docker compose -f docker-compose.prod.yml up -d --build
+            sudo bash scripts/deploy-ovh.sh
             echo "✅ Déployé $(date)"
