@@ -4,7 +4,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG VITE_VITRINE_URL=https://www.phoenixsekur.com
 ENV VITE_USE_OWN_API=true
+ENV VITE_VITRINE_URL=$VITE_VITRINE_URL
 RUN npm run build
 
 FROM nginx:alpine

@@ -1,5 +1,6 @@
 const TOKEN_KEY = 'phoenix_access_token';
 const API_BASE = '/api';
+const VITRINE_URL = (import.meta.env.VITE_VITRINE_URL || 'https://www.phoenixsekur.com').replace(/\/$/, '');
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('base44_access_token');
@@ -22,7 +23,7 @@ async function apiFetch(path, options = {}) {
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'include' });
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
@@ -148,14 +149,12 @@ export const phoenix = {
     logout(redirectUrl) {
       fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
       clearToken();
-      if (redirectUrl) window.location.href = redirectUrl;
+      window.location.href = redirectUrl || `${VITRINE_URL}/`;
     },
 
     redirectToLogin(returnUrl) {
-      const url = returnUrl
-        ? `/login?return=${encodeURIComponent(returnUrl)}`
-        : '/login';
-      window.location.href = url;
+      const ret = returnUrl || window.location.href;
+      window.location.href = `${VITRINE_URL}/login.html?return=${encodeURIComponent(ret)}`;
     },
 
     setToken,

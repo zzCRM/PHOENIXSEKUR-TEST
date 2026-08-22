@@ -9,7 +9,13 @@ ${VITRINE_DOMAIN}, ${ROOT_DOMAIN} {
   @apex host ${ROOT_DOMAIN}
   redir @apex https://${VITRINE_DOMAIN}{uri} permanent
 
-  reverse_proxy vitrine:80
+  handle /api/* {
+    reverse_proxy backend:3001
+  }
+
+  handle {
+    reverse_proxy vitrine:80
+  }
 }
 
 # ─── Application SaaS (app.phoenixsekur.com) ────────────────────────────────

@@ -6,19 +6,27 @@ import { isSuperAdmin } from '../lib/superadmin.js';
 import { isCompanyAccessAllowed } from '../lib/platform-settings.js';
 import { getValidInvitation, roleLabel } from '../lib/invitations.js';
 import { setAuthCookie, clearAuthCookie, getAppUrl } from '../lib/auth-cookie.js';
+import {
+  roleMatchesPortal, portalMismatchMessage, createPasswordReset, getValidPasswordReset,
+} from '../lib/password-reset.js';
 
 const router = Router();
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, portal } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ error: 'Email et mot de passe requis' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Identifiants incorrects' });
+    }
+
+    if (portal && !roleMatchesPortal(user, portal)) {
+      return res.status(403).json({ error: portalMismatchMessage(portal) });
     }
 
     if (!isSuperAdmin({ email: user.email, role: user.role })) {
@@ -32,14 +40,16 @@ router.post('/login', async (req, res) => {
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Identifiants incorrects' });
     }
 
     const token = signToken(user);
     const superadmin = isSuperAdmin({ email: user.email, role: user.role });
     setAuthCookie(res, token);
+    const appUrl = getAppUrl();
     res.json({
       access_token: token,
+      redirect: superadmin ? `${appUrl}/super-admin` : `${appUrl}/`,
       user: {
         id: user.id,
         email: user.email,
@@ -52,7 +62,59 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Connexion impossible' });
+  }
+});
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requis' });
+    const result = await createPasswordReset(email);
+    res.json({
+      success: true,
+      message: result.message,
+      reset_url: result.resetUrl,
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Impossible d\'envoyer l\'email' });
+  }
+});
+
+router.get('/reset-password/:token', async (req, res) => {
+  const reset = await getValidPasswordReset(req.params.token);
+  if (!reset) return res.status(404).json({ error: 'Lien expiré ou invalide' });
+  res.json({ email: reset.email, valid: true });
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Token et mot de passe requis' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères' });
+    }
+
+    const reset = await getValidPasswordReset(token);
+    if (!reset) return res.status(404).json({ error: 'Lien expiré ou invalide' });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { email: reset.email },
+      data: { passwordHash },
+    });
+    await prisma.passwordReset.update({
+      where: { id: reset.id },
+      data: { usedAt: new Date() },
+    });
+
+    res.json({ success: true, message: 'Mot de passe mis à jour. Vous pouvez vous connecter.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Réinitialisation impossible' });
   }
 });
 
@@ -174,10 +236,12 @@ router.get('/session', async (req, res) => {
     }
     const superadmin = isSuperAdmin({ email: user.email, role: user.role });
     const appUrl = getAppUrl();
+    const accessToken = signToken(user);
     res.json({
       authenticated: true,
+      access_token: accessToken,
       redirect: superadmin ? `${appUrl}/super-admin` : `${appUrl}/`,
-      user: { email: user.email, superadmin },
+      user: { email: user.email, superadmin, role: user.role },
     });
   } catch {
     res.json({ authenticated: false });

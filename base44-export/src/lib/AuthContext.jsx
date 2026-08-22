@@ -26,7 +26,19 @@ export const AuthProvider = ({ children }) => {
       // Mode autonome (sans Base44)
       if (isOwnApi) {
         setAppPublicSettings({ id: 'phoenixsekur', public_settings: {} });
-        const token = base44.auth.getToken?.();
+        let token = base44.auth.getToken?.();
+        if (!token) {
+          try {
+            const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
+            const sessionData = await sessionRes.json();
+            if (sessionData.authenticated && sessionData.access_token) {
+              base44.auth.setToken(sessionData.access_token);
+              token = sessionData.access_token;
+            }
+          } catch {
+            // Pas de session cookie — redirection vers www
+          }
+        }
         if (token) {
           await checkUserAuth();
         } else {

@@ -103,3 +103,33 @@ export async function sendSignupNotifyEmail({ signupRequest }) {
   }
   return { sent: true };
 }
+
+export async function sendPasswordResetEmail({ to, resetUrl }) {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const subject = 'Réinitialisation de votre mot de passe — Phoenix Sekur';
+  const text = [
+    'Bonjour,',
+    '',
+    'Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe (valide 1 heure) :',
+    resetUrl,
+    '',
+    '— L\'équipe Phoenix Sekur',
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #c0392b;">Phoenix Sekur</h2>
+      <p>Cliquez pour réinitialiser votre mot de passe :</p>
+      <p><a href="${resetUrl}" style="background:#c0392b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;">Nouveau mot de passe</a></p>
+    </div>
+  `;
+
+  const transport = getTransporter();
+  if (!transport) {
+    console.log(`[email] Reset password pour ${to}: ${resetUrl}`);
+    return { sent: false, reason: 'smtp_not_configured' };
+  }
+
+  await transport.sendMail({ from, to, subject, text, html });
+  return { sent: true };
+}

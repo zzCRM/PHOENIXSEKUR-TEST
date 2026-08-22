@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mot de passe oublié — Phoenix Sekur</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/auth.css" />
+  <script src="/config.js"></script>
+</head>
+<body class="auth-page">
+  <div class="auth-bg"></div>
+  <div class="auth-wrap">
+    <a href="/" class="auth-logo"><span class="logo-flame">🔥</span> Phoenix <strong>Sekur</strong></a>
+    <div class="auth-card">
+      <h1>Mot de passe oublié</h1>
+      <p class="auth-sub">Entrez votre email — nous vous enverrons un lien pour créer un nouveau mot de passe.</p>
+      <form id="forgot-form" class="auth-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" required placeholder="vous@societe.fr" />
+        </div>
+        <div id="msg-success" class="form-msg success hidden"></div>
+        <div id="msg-error" class="form-msg error hidden"></div>
+        <div id="msg-link" class="form-msg info hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Envoyer le lien</button>
+      </form>
+      <p class="auth-forgot"><a href="/login.html">← Retour à la connexion</a></p>
+    </div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script src="/js/forgot.js"></script>
+</body>
+</html>

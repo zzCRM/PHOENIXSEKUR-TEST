@@ -1,38 +1,45 @@
 (function () {
   const APP_URL = (window.PHOENIX_CONFIG?.appUrl || 'https://app.phoenixsekur.com').replace(/\/$/, '');
+  const LOGIN_URL = '/login.html';
 
-  function appLink(path) {
-    return APP_URL + (path || '');
-  }
+  const loginLinks = [
+    'btn-login', 'hero-login-link', 'cta-login-link', 'footer-login-link',
+  ];
 
-  // Liens vers l'application
-  document.getElementById('btn-login').href = appLink('/login');
-  document.getElementById('btn-app').href = appLink('/');
-  document.getElementById('hero-app-link').href = appLink('/login');
-  document.getElementById('cta-app-link').href = appLink('/login');
-  document.getElementById('footer-app-link').href = APP_URL;
-  document.getElementById('footer-app-link').textContent = APP_URL.replace('https://', '');
+  loginLinks.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.href = LOGIN_URL;
+  });
 
-  // Si déjà connecté sur app → basculer automatiquement vers l'app
-  async function checkSessionAndRedirect() {
+  const footerLabel = document.getElementById('footer-app-label');
+  if (footerLabel) {
     try {
-      const res = await fetch(appLink('/api/auth/session'), {
-        credentials: 'include',
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.authenticated) {
-        window.location.href = data.redirect || appLink('/');
-      }
+      footerLabel.textContent = new URL(APP_URL).host;
     } catch {
-      // Vitrine reste affichée
+      footerLabel.textContent = 'app.phoenixsekur.com';
     }
   }
 
-  checkSessionAndRedirect();
+  async function initNav() {
+    const btnApp = document.getElementById('btn-app');
+    try {
+      const res = await fetch('/api/auth/session', { credentials: 'include' });
+      const data = await res.json();
+      if (data.authenticated) {
+        window.location.href = data.redirect || APP_URL;
+        return;
+      }
+      if (btnApp) btnApp.href = LOGIN_URL;
+    } catch {
+      if (btnApp) btnApp.href = LOGIN_URL;
+    }
+  }
 
-  // Formulaire d'inscription essai
+  initNav();
+
   const form = document.getElementById('signup-form');
+  if (!form) return;
+
   const successEl = document.getElementById('form-success');
   const errorEl = document.getElementById('form-error');
   const submitBtn = document.getElementById('submit-btn');
@@ -48,17 +55,13 @@
     const body = Object.fromEntries(fd.entries());
 
     try {
-      const res = await fetch(appLink('/api/public/signup-request'), {
+      const res = await fetch('/api/public/signup-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erreur lors de l\'envoi');
-      }
-
+      if (!res.ok) throw new Error(data.error || 'Erreur lors de l\'envoi');
       successEl.textContent = data.message || 'Demande envoyée ! Nous vous contactons sous 24–48 h.';
       successEl.classList.remove('hidden');
       form.reset();

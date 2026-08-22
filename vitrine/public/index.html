@@ -11,20 +11,22 @@
   <script src="/config.js"></script>
 </head>
 <body>
+  <div class="page-bg" aria-hidden="true"></div>
+
   <header class="header">
     <div class="container header-inner">
       <a href="/" class="logo">
-        <span class="logo-icon">🔥</span>
+        <span class="logo-mark">🔥</span>
         <span>Phoenix <strong>Sekur</strong></span>
       </a>
       <nav class="nav">
         <a href="#fonctionnalites">Fonctionnalités</a>
+        <a href="#portails">Espaces</a>
         <a href="#essai">Essai gratuit</a>
-        <a href="#contact">Contact</a>
       </nav>
       <div class="header-actions">
-        <a id="btn-login" href="#" class="btn btn-ghost">Se connecter</a>
-        <a id="btn-app" href="#" class="btn btn-primary">Mon espace</a>
+        <a id="btn-login" href="/login.html" class="btn btn-ghost">Se connecter</a>
+        <a id="btn-app" href="/login.html" class="btn btn-primary">Mon espace</a>
       </div>
     </div>
   </header>
@@ -32,27 +34,50 @@
   <section class="hero">
     <div class="container hero-grid">
       <div class="hero-content">
-        <span class="badge">Solution SaaS pour la sécurité privée</span>
-        <h1>Pilotez votre activité de <span class="text-accent">gardiennage</span> en un seul endroit</h1>
+        <span class="badge">Solution SaaS · Sécurité privée</span>
+        <h1>Pilotez votre activité de <span class="text-gradient">gardiennage</span> en temps réel</h1>
         <p class="hero-lead">
-          Planning, main courante, rondes NFC, facturation, espace agent et espace client —
-          la plateforme tout-en-un pensée pour les sociétés de sécurité.
+          Planning, main courante, rondes NFC, facturation et portails dédiés —
+          une plateforme unifiée pour dirigeants, agents et clients.
         </p>
         <div class="hero-cta">
           <a href="#essai" class="btn btn-primary btn-lg">Demander un essai gratuit</a>
-          <a id="hero-app-link" href="#" class="btn btn-outline btn-lg">Accéder à l'application</a>
+          <a id="hero-login-link" href="/login.html" class="btn btn-glass btn-lg">Se connecter</a>
         </div>
-        <p class="hero-note">✓ Essai 14 jours · ✓ Sans engagement · ✓ Hébergé en France</p>
+        <ul class="hero-perks">
+          <li>Essai 14 jours</li>
+          <li>Sans engagement</li>
+          <li>Hébergé en France</li>
+        </ul>
       </div>
       <div class="hero-visual">
-        <div class="mockup">
-          <div class="mockup-bar"><span></span><span></span><span></span></div>
-          <div class="mockup-body">
-            <div class="mockup-sidebar"></div>
-            <div class="mockup-main">
-              <div class="mockup-card"></div>
-              <div class="mockup-card short"></div>
-              <div class="mockup-card"></div>
+        <div class="dashboard-preview">
+          <div class="preview-glow"></div>
+          <div class="preview-window">
+            <div class="preview-bar">
+              <span></span><span></span><span></span>
+              <div class="preview-url">app.phoenixsekur.com</div>
+            </div>
+            <div class="preview-body">
+              <aside class="preview-nav">
+                <div class="nav-dot active"></div>
+                <div class="nav-dot"></div>
+                <div class="nav-dot"></div>
+                <div class="nav-dot"></div>
+              </aside>
+              <main class="preview-main">
+                <div class="preview-stat-row">
+                  <div class="preview-stat"></div>
+                  <div class="preview-stat"></div>
+                  <div class="preview-stat"></div>
+                </div>
+                <div class="preview-chart"></div>
+                <div class="preview-list">
+                  <div class="preview-row"></div>
+                  <div class="preview-row"></div>
+                  <div class="preview-row short"></div>
+                </div>
+              </main>
             </div>
           </div>
         </div>
@@ -60,9 +85,32 @@
     </div>
   </section>
 
+  <section class="stats-band">
+    <div class="container stats-grid">
+      <div class="stat-item">
+        <strong>100%</strong>
+        <span>Cloud & sécurisé</span>
+      </div>
+      <div class="stat-item">
+        <strong>3</strong>
+        <span>Portails dédiés</span>
+      </div>
+      <div class="stat-item">
+        <strong>24/7</strong>
+        <span>Main courante temps réel</span>
+      </div>
+      <div class="stat-item">
+        <strong>NFC</strong>
+        <span>Rondes traçables</span>
+      </div>
+    </div>
+  </section>
+
   <section id="fonctionnalites" class="features">
     <div class="container">
+      <p class="section-kicker">Fonctionnalités</p>
       <h2 class="section-title">Tout ce dont votre société a besoin</h2>
+      <p class="section-sub">De la planification à la facturation, centralisez vos opérations sur une seule plateforme.</p>
       <div class="features-grid">
         <article class="feature-card">
           <div class="feature-icon">📅</div>
@@ -72,7 +120,7 @@
         <article class="feature-card">
           <div class="feature-icon">📋</div>
           <h3>Main courante</h3>
-          <p>Journal de bord numérique, événements, rapports PDF automatiques pour vos clients.</p>
+          <p>Journal de bord numérique, événements et rapports PDF automatiques.</p>
         </article>
         <article class="feature-card">
           <div class="feature-icon">🔄</div>
@@ -87,21 +135,50 @@
         <article class="feature-card">
           <div class="feature-icon">👮</div>
           <h3>Espace agent</h3>
-          <p>Missions, PTI, fiches de paie, demandes de congés depuis mobile.</p>
+          <p>Missions, PTI, fiches de paie et congés depuis mobile.</p>
         </article>
         <article class="feature-card">
           <div class="feature-icon">🏢</div>
           <h3>Espace client</h3>
-          <p>Portail client : planning, documents, main courante et rapports en temps réel.</p>
+          <p>Portail client : planning, documents et rapports en temps réel.</p>
         </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="portails" class="portals">
+    <div class="container">
+      <p class="section-kicker">Connexion</p>
+      <h2 class="section-title">Trois espaces, une seule plateforme</h2>
+      <p class="section-sub">Connectez-vous depuis la vitrine — vous serez redirigé vers l'application une fois authentifié.</p>
+      <div class="portals-grid">
+        <a href="/login.html?portal=entreprise" class="portal-card">
+          <span class="portal-card-icon">🏢</span>
+          <h3>Entreprise</h3>
+          <p>Administrateurs et direction — pilotage complet de la société.</p>
+          <span class="portal-link">Connexion entreprise →</span>
+        </a>
+        <a href="/login.html?portal=collaborateur" class="portal-card">
+          <span class="portal-card-icon">👮</span>
+          <h3>Collaborateur</h3>
+          <p>Agents et équipes terrain — missions, rondes et documents.</p>
+          <span class="portal-link">Connexion collaborateur →</span>
+        </a>
+        <a href="/login.html?portal=client" class="portal-card">
+          <span class="portal-card-icon">🏛️</span>
+          <h3>Client</h3>
+          <p>Donneurs d'ordre — suivi des sites et rapports d'activité.</p>
+          <span class="portal-link">Connexion client →</span>
+        </a>
       </div>
     </div>
   </section>
 
   <section id="essai" class="signup-section">
     <div class="container signup-grid">
-      <div>
-        <h2 class="section-title">Demandez votre essai gratuit</h2>
+      <div class="signup-copy">
+        <p class="section-kicker">Essai gratuit</p>
+        <h2 class="section-title">Démarrez en 48 h</h2>
         <p class="section-sub">
           Remplissez le formulaire — notre équipe active votre espace sous 24–48 h.
           Vous recevrez un email pour créer votre compte administrateur.
@@ -150,20 +227,24 @@
     </div>
   </section>
 
-  <section id="contact" class="cta-band">
+  <section class="cta-band">
     <div class="container cta-inner">
       <div>
         <h2>Déjà client ?</h2>
-        <p>Connectez-vous à votre espace applicatif.</p>
+        <p>Connectez-vous pour accéder à votre espace applicatif.</p>
       </div>
-      <a id="cta-app-link" href="#" class="btn btn-white btn-lg">Ouvrir l'application →</a>
+      <a id="cta-login-link" href="/login.html" class="btn btn-white btn-lg">Se connecter →</a>
     </div>
   </section>
 
   <footer class="footer">
     <div class="container footer-inner">
-      <p>© 2026 Phoenix Sekur — Phoenix Personal Security France</p>
-      <p><a id="footer-app-link" href="#">app.phoenixsekur.com</a></p>
+      <div class="footer-brand">
+        <span class="logo-mark">🔥</span>
+        <span>Phoenix Sekur</span>
+      </div>
+      <p>© 2026 Phoenix Personal Security France</p>
+      <p><a id="footer-login-link" href="/login.html">Connexion</a> · <span id="footer-app-label">app.phoenixsekur.com</span></p>
     </div>
   </footer>
 
