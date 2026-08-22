@@ -6,7 +6,7 @@ import {
   BookOpen, Route, BarChart3, MessageSquare,
   Navigation, UserPlus, CalendarDays,
   FileSignature, ClipboardCheck, Clock, ScanLine,
-  ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock
+  ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock, Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
@@ -64,6 +64,7 @@ const baseNavGroups = [
     items: [
       { icon: Users, label: 'Collaborateurs', path: '/agents' },
       { icon: Clock, label: 'Heures', path: '/heures-collaborateurs' },
+      { icon: Wallet, label: 'Prépaie', path: '/prepaie' },
       { icon: CalendarDays, label: 'Demandes', path: '/conges' },
     ]
   },

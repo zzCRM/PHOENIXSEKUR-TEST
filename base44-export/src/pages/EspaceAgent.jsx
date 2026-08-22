@@ -14,6 +14,7 @@ import { useGeolocation } from '@/lib/useGeolocation';
 import { usePtiTimer } from '@/lib/usePtiTimer';
 import { toast } from 'sonner';
 import PriseDeServiceNFC from '@/components/agent/PriseDeServiceNFC';
+import FinDeServicePhoto from '@/components/agent/FinDeServicePhoto';
 import RondeNFC from '@/components/agent/RondeNFC';
 
 const CATEGORY_CONFIG = {
@@ -38,6 +39,7 @@ function AccessDenied({ label }) {
 export default function EspaceAgent() {
   const [activeTab, setActiveTab] = useState('accueil');
   const [showPriseForm, setShowPriseForm] = useState(false);
+  const [showFinService, setShowFinService] = useState(false);
   const [selectedMission, setSelectedMission] = useState(null);
   const [showRondeDialog, setShowRondeDialog] = useState(false);
   const [selectedRonde, setSelectedRonde] = useState(null);
@@ -252,27 +254,9 @@ export default function EspaceAgent() {
     localStorage.setItem('last_seen_consignes', JSON.stringify(updated));
   };
 
-  const handleFinService = async () => {
+  const handleFinService = () => {
     if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    await serviceUpdateMut.mutateAsync({
-      id: currentService.id,
-      data: { actual_end: now, status: 'termine', end_latitude: position?.latitude, end_longitude: position?.longitude }
-    });
-    await mcCreateMut.mutateAsync({
-      company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
-      client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
-      date: today, time: now, type: 'depart',
-      content: `Fin de service - ${agentName} a quitté le site à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
-    });
-    await alerteMut.mutateAsync({
-      company_id: companyId, type: 'fin_service', agent_id: user?.id, agent_name: agentName,
-      site_id: currentService.site_id, site_name: currentService.site_name, client_name: currentService.client_name,
-      message: `${agentName} a terminé son service sur ${currentService.site_name} à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, date: today, time: now, severity: 'info',
-    });
-    qc.invalidateQueries({ queryKey: ['alertes'] });
+    setShowFinService(true);
   };
 
   const handlePtiCheck = async () => {
@@ -367,7 +351,7 @@ export default function EspaceAgent() {
               </div>
               <p className="font-bold text-lg">{currentService.site_name}</p>
               <p className="text-sm text-muted-foreground">Depuis {currentService.actual_start}</p>
-              {droits.acces_services && <Button variant="destructive" size="sm" className="mt-3" onClick={handleFinService}>Terminer le service</Button>}
+              {droits.acces_services && <Button variant="destructive" size="sm" className="mt-3" onClick={handleFinService}>Terminer (photo + GPS)</Button>}
             </Card>
           ) : (
             <Card className="p-5">
@@ -759,6 +743,26 @@ export default function EspaceAgent() {
               agentId={user?.id}
               agentName={agentName}
               onSuccess={() => { setShowPriseForm(false); setSelectedMission(null); qc.invalidateQueries({ queryKey: ['prises_service'] }); }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Fin de service certifiée */}
+      <Dialog open={showFinService && !!currentService} onOpenChange={(open) => { if (!open) setShowFinService(false); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Terminer le service</DialogTitle></DialogHeader>
+          {currentService && (
+            <FinDeServicePhoto
+              service={currentService}
+              companyId={companyId}
+              agentId={user?.id}
+              agentName={agentName}
+              onSuccess={() => {
+                setShowFinService(false);
+                qc.invalidateQueries({ queryKey: ['prises_service'] });
+                qc.invalidateQueries({ queryKey: ['alertes'] });
+              }}
             />
           )}
         </DialogContent>

@@ -35,6 +35,7 @@ import GestionRH from '@/pages/GestionRH';
 import EcartsHoraires from '@/pages/EcartsHoraires';
 import PointsControle from '@/pages/PointsControle';
 import HeuresCollaborateurs from '@/pages/HeuresCollaborateurs';
+import Prepaie from '@/pages/Prepaie';
 import RapportsPDF from '@/pages/RapportsPDF';
 import Leads from '@/pages/Leads';
 import Login from '@/pages/Login';
@@ -92,6 +93,7 @@ const AuthenticatedApp = () => {
         <Route path="/ecarts-horaires" element={<EcartsHoraires />} />
         <Route path="/points-controle" element={<PointsControle />} />
         <Route path="/heures-collaborateurs" element={<HeuresCollaborateurs />} />
+        <Route path="/prepaie" element={<Prepaie />} />
         <Route path="/rapports-pdf" element={<RapportsPDF />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/super-admin" element={<SuperAdmin />} />

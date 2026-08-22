@@ -1,24 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Building2, Save, Upload, Shield, Phone, Mail, MapPin, FileText, CreditCard } from 'lucide-react';
+import { Building2, Save, Upload, Shield, Phone, Mail, MapPin, FileText, CreditCard, Clock } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import { LEGAL_FORMS } from '@/lib/legalForms';
 import { useCompany } from '@/lib/useCompany';
 import { toast } from 'sonner';
+
+const REPORT_MODULES = [
+  { key: 'main_courante', label: 'Main courante' },
+  { key: 'rondes', label: 'Rondes' },
+  { key: 'incidents', label: 'Incidents / PTI' },
+  { key: 'planning', label: 'Planning' },
+];
 
 export default function ParametresSociete() {
   const { companyId, isAdmin } = useCompany();
   const qc = useQueryClient();
   const [form, setForm] = useState({});
   const [uploading, setUploading] = useState(false);
+  const [testingReport, setTestingReport] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['company_settings', companyId],
@@ -62,7 +72,44 @@ export default function ParametresSociete() {
 
   const update = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
 
+  const schedule = form.report_schedule || {};
+  const updateSchedule = (field, val) => {
+    setForm((prev) => ({
+      ...prev,
+      report_schedule: {
+        enabled: false,
+        frequency: 'weekly',
+        send_to_clients: true,
+        send_to_company: true,
+        only_opt_in_clients: true,
+        modules: ['main_courante', 'rondes', 'incidents'],
+        ...(prev.report_schedule || {}),
+        [field]: val,
+      },
+    }));
+  };
 
+  const toggleModule = (key) => {
+    const current = schedule.modules || ['main_courante', 'rondes', 'incidents'];
+    const next = current.includes(key)
+      ? current.filter((k) => k !== key)
+      : [...current, key];
+    updateSchedule('modules', next);
+  };
+
+  const handleTestReport = async () => {
+    setTestingReport(true);
+    try {
+      // Sauvegarder d'abord les paramètres
+      await saveMut.mutateAsync(form);
+      const res = await base44.reports.runScheduled();
+      toast.success(res.message || 'Test d\'envoi lancé');
+    } catch (err) {
+      toast.error(err.message || 'Échec du test');
+    } finally {
+      setTestingReport(false);
+    }
+  };
 
   return (
     <div>
@@ -78,11 +125,12 @@ export default function ParametresSociete() {
       </div>
 
       <Tabs defaultValue="identite">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 flex-wrap h-auto">
           <TabsTrigger value="identite">Identité</TabsTrigger>
           <TabsTrigger value="coordonnees">Coordonnées</TabsTrigger>
           <TabsTrigger value="legal">Informations légales</TabsTrigger>
           <TabsTrigger value="bancaire">Banque & Assurance</TabsTrigger>
+          <TabsTrigger value="rapports">Rapports clients</TabsTrigger>
         </TabsList>
 
         {/* IDENTITÉ */}
@@ -218,6 +266,137 @@ export default function ParametresSociete() {
                 <Input value={form.insurance_number || ''} onChange={e => update('insurance_number', e.target.value)} placeholder="Police n° 0000000" />
               </div>
             </div>
+          </Card>
+        </TabsContent>
+
+        {/* RAPPORTS CLIENTS AUTO */}
+        <TabsContent value="rapports">
+          <Card className="p-6 space-y-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-primary" />
+                  Envoi automatique des rapports aux clients
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Les clients reçoivent par email un rapport de sécurité selon la fréquence choisie.
+                </p>
+              </div>
+              <Switch
+                checked={!!schedule.enabled}
+                onCheckedChange={(v) => updateSchedule('enabled', v)}
+              />
+            </div>
+
+            {schedule.enabled && (
+              <div className="space-y-5 border-t pt-5">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><Clock className="w-4 h-4" />Fréquence</Label>
+                  <Select
+                    value={schedule.frequency || 'weekly'}
+                    onValueChange={(v) => updateSchedule('frequency', v)}
+                  >
+                    <SelectTrigger className="max-w-md">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Quotidien (chaque matin à 7h)</SelectItem>
+                      <SelectItem value="weekly">Hebdomadaire (lundi à 7h)</SelectItem>
+                      <SelectItem value="monthly">Mensuel (1er du mois à 7h)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Contenu du rapport</Label>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {REPORT_MODULES.map((m) => {
+                      const checked = (schedule.modules || ['main_courante', 'rondes', 'incidents']).includes(m.key);
+                      return (
+                        <label key={m.key} className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/30">
+                          <Checkbox checked={checked} onCheckedChange={() => toggleModule(m.key)} />
+                          <span className="text-sm">{m.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between gap-4 p-3 border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">Envoyer à chaque client</p>
+                      <p className="text-xs text-muted-foreground">Email principal + contacts du client</p>
+                    </div>
+                    <Switch
+                      checked={schedule.send_to_clients !== false}
+                      onCheckedChange={(v) => updateSchedule('send_to_clients', v)}
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-4 p-3 border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">Uniquement clients ayant activé la réception</p>
+                      <p className="text-xs text-muted-foreground">
+                        Option « Recevoir le rapport auto » dans la fiche client
+                      </p>
+                    </div>
+                    <Switch
+                      checked={schedule.only_opt_in_clients !== false}
+                      onCheckedChange={(v) => updateSchedule('only_opt_in_clients', v)}
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between gap-4 p-3 border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">Copie à la société</p>
+                      <p className="text-xs text-muted-foreground">Recevoir aussi le rapport global</p>
+                    </div>
+                    <Switch
+                      checked={!!schedule.send_to_company}
+                      onCheckedChange={(v) => updateSchedule('send_to_company', v)}
+                    />
+                  </label>
+                </div>
+
+                {schedule.send_to_company && (
+                  <div className="space-y-2">
+                    <Label>Email copie société</Label>
+                    <Input
+                      type="email"
+                      value={schedule.company_copy_email || form.email || ''}
+                      onChange={(e) => updateSchedule('company_copy_email', e.target.value)}
+                      placeholder={form.email || 'contact@societe.fr'}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Emails additionnels (optionnel)</Label>
+                  <Input
+                    value={schedule.recipients || ''}
+                    onChange={(e) => updateSchedule('recipients', e.target.value)}
+                    placeholder="responsable@societe.fr, direction@societe.fr"
+                  />
+                  <p className="text-xs text-muted-foreground">Séparés par des virgules</p>
+                </div>
+
+                {schedule.last_sent_date && (
+                  <p className="text-xs text-muted-foreground">
+                    Dernier envoi automatique : {schedule.last_sent_date}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={handleTestReport} disabled={testingReport || saveMut.isPending}>
+                    {testingReport ? 'Envoi…' : 'Tester l\'envoi maintenant'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground self-center">
+                    Sauvegarde les paramètres puis envoie immédiatement aux clients éligibles.
+                  </p>
+                </div>
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

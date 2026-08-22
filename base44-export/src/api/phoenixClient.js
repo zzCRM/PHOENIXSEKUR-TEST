@@ -125,6 +125,9 @@ export const phoenix = {
         body: JSON.stringify(payload),
       });
     },
+    async runScheduled() {
+      return apiFetch('/reports/run-scheduled', { method: 'POST', body: '{}' });
+    },
   },
 
   auth: {

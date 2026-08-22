@@ -420,9 +420,9 @@ export default function RapportsPDF() {
                     <SelectItem value="monthly">Mensuel (1er du mois)</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
+                <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                  Envoi automatique actif : quotidien 7h, hebdo lundi 7h ou mensuel le 1er à 7h (email récapitulatif).
+                  Préférez configurer l'envoi auto dans <strong>Paramètres société → Rapports clients</strong> pour envoyer à tous vos clients.
                 </div>
               </CardContent>
             )}

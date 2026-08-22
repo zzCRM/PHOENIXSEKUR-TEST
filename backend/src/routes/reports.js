@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { sendReportEmail, buildReportSummaryText } from '../lib/report-email.js';
-import { getEntityDelegate, toApiRecord } from '../lib/prisma.js';
+import { getEntityDelegate } from '../lib/prisma.js';
+import { runScheduledReports } from '../lib/report-scheduler.js';
 
 const router = Router();
 
@@ -80,6 +81,25 @@ router.post('/send-email', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Report email error:', err);
     res.status(500).json({ error: 'Envoi du rapport impossible' });
+  }
+});
+
+/** Déclenche manuellement le job d'envoi auto (test depuis Paramètres). */
+router.post('/run-scheduled', requireAuth, async (req, res) => {
+  try {
+    const result = await runScheduledReports({
+      force: true,
+      companyId: req.user.companyId || null,
+    });
+    res.json({
+      success: true,
+      ...result,
+      message: result.sentCount
+        ? `${result.sentCount} email(s) envoyé(s)`
+        : 'Aucun destinataire trouvé (activez l\'option et vérifiez les emails clients)',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
