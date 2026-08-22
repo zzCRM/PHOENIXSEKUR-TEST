@@ -15,7 +15,7 @@ dotenv.config();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.argv[2] || join(__dirname, '../../base44-export/data/exports');
 
-const prisma = new PrismaClient();
+const DEFAULT_COMPANY = process.env.ADMIN_COMPANY_ID || '69edb44339460eb505c2a699';
 
 const FILE_TO_ENTITY = {
   'Agent_export.csv': 'Agent',
@@ -91,7 +91,7 @@ async function importRows(entityName, rows) {
   for (const row of rows) {
     const parsed = splitIncomingRecord(row);
     const id = parsed.id || generateId();
-    const companyId = parsed.companyId || parsed.data?.company_id || 'default';
+    const companyId = parsed.companyId || parsed.data?.company_id || DEFAULT_COMPANY;
 
     await delegate.upsert({
       where: { id },

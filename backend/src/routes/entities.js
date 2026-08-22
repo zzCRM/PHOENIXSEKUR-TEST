@@ -23,7 +23,12 @@ router.get('/:entityName', async (req, res) => {
     const query = q ? JSON.parse(q) : {};
 
     const where = {};
-    if (query.company_id) where.companyId = query.company_id;
+    if (query.company_id) {
+      where.OR = [
+        { companyId: query.company_id },
+        { companyId: 'default' },
+      ];
+    }
 
     const rows = await delegate.findMany({
       where: Object.keys(where).length ? where : undefined,

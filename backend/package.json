@@ -11,6 +11,8 @@
     "db:push": "prisma db push",
     "db:seed": "node scripts/migrate-csv.js",
     "seed:admin": "node scripts/seed-admin.js",
+    "seed:phase3": "node scripts/seed-phase3.js",
+    "fix:company-ids": "node scripts/fix-company-ids.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
