@@ -33,7 +33,7 @@ Type    Sous-domaine    Cible
 A       app             51.xxx.xxx.xxx   (IP du VPS)
 ```
 
-Résultat : `app.phoenixsekur.fr` → votre serveur.
+Résultat : `app.phoenixsekur.com` → votre serveur.
 
 ---
 
@@ -74,7 +74,7 @@ nano .env.production   # Éditez DOMAIN, mots de passe, email
 ```
 
 **Important dans `.env.production` :**
-- `DOMAIN=app.phoenixsekur.fr` (votre sous-domaine)
+- `DOMAIN=app.phoenixsekur.com` (votre sous-domaine)
 - `POSTGRES_PASSWORD=` → mot de passe fort unique
 - `JWT_SECRET=` → `openssl rand -hex 32`
 - `ADMIN_PASSWORD=` → mot de passe admin prod
@@ -101,7 +101,7 @@ docker compose -f docker-compose.prod.yml exec backend npm run fix:company-ids
 
 ## Étape 6 — Vérifier
 
-Ouvrez **https://app.phoenixsekur.fr/login**
+Ouvrez **https://app.phoenixsekur.com/login**
 
 - Email : celui défini dans `ADMIN_EMAIL`
 - Mot de passe : celui défini dans `ADMIN_PASSWORD`
