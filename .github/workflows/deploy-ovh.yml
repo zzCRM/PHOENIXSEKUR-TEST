@@ -42,5 +42,6 @@ jobs:
                 bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production
             fi
             sudo bash scripts/ensure-vitrine-env.sh /opt/phoenixsekur/.env.production || true
+            sudo bash scripts/ensure-superadmin-env.sh /opt/phoenixsekur/.env.production || true
             sudo bash scripts/deploy-ovh.sh
             echo "✅ Déployé $(date)"

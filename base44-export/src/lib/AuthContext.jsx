@@ -123,11 +123,11 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
 
     if (isOwnApi) {
-      base44.auth.logout(shouldRedirect);
+      base44.auth.logout(shouldRedirect ? undefined : null);
     } else if (shouldRedirect) {
       base44.auth.logout(window.location.href);
     } else {
-      base44.auth.logout();
+      base44.auth.logout(null);
     }
   };
 

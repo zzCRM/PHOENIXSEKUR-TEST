@@ -21,6 +21,11 @@
   }
 
   async function initNav() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('logged_out')) {
+      history.replaceState(null, '', window.location.pathname);
+      return;
+    }
     const btnApp = document.getElementById('btn-app');
     try {
       const res = await fetch('/api/auth/session', { credentials: 'include' });

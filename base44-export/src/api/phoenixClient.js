@@ -146,10 +146,19 @@ export const phoenix = {
       return result;
     },
 
-    logout(redirectUrl) {
-      fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
+    async logout(redirectUrl) {
+      try {
+        await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+      } catch {
+        /* redirect même si l'API échoue */
+      }
       clearToken();
-      window.location.href = redirectUrl || `${VITRINE_URL}/`;
+      const dest = typeof redirectUrl === 'string' && redirectUrl.startsWith('http')
+        ? redirectUrl
+        : redirectUrl === null
+          ? undefined
+          : `${VITRINE_URL}/?logged_out=1`;
+      if (dest) window.location.href = dest;
     },
 
     redirectToLogin(returnUrl) {
