@@ -25,7 +25,7 @@ export function useCompany() {
         // Agent/Client non-admin = company_id stocké sur son profil
         const cid = u.company_id || u.companyId || (u.role === 'admin' ? u.id : null);
         setCompanyId(cid);
-        setIsAdmin(u.role === 'admin');
+        setIsAdmin(u.role === 'admin' || u.role === 'superadmin' || u.superadmin);
       }
       setLoading(false);
     }).catch(() => {
