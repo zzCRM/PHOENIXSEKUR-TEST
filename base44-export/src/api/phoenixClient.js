@@ -34,21 +34,37 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
+async function uploadFile(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/files/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  return data;
+}
+
 function createEntityHandler(entityName) {
   return {
-    async list(sort, limit) {
+    async list(sort, limit, skip) {
       const params = new URLSearchParams();
       if (sort) params.set('sort', sort);
       if (limit) params.set('limit', String(limit));
+      if (skip) params.set('skip', String(skip));
       const qs = params.toString();
       return apiFetch(`/entities/${entityName}${qs ? `?${qs}` : ''}`);
     },
 
-    async filter(query, sort, limit) {
+    async filter(query, sort, limit, skip) {
       const params = new URLSearchParams();
       params.set('q', JSON.stringify(query || {}));
       if (sort) params.set('sort', sort);
       if (limit) params.set('limit', String(limit));
+      if (skip) params.set('skip', String(skip));
       return apiFetch(`/entities/${entityName}?${params}`);
     },
 
@@ -94,7 +110,6 @@ const entities = new Proxy(
   }
 );
 
-// Pre-bind known entities for tooling
 ENTITY_NAMES.forEach((name) => {
   entities[name] = createEntityHandler(name);
 });
@@ -118,9 +133,7 @@ export const phoenix = {
 
     logout(redirectUrl) {
       clearToken();
-      if (redirectUrl) {
-        window.location.href = '/login';
-      }
+      if (redirectUrl) window.location.href = '/login';
     },
 
     redirectToLogin(returnUrl) {
@@ -134,10 +147,32 @@ export const phoenix = {
     getToken,
   },
 
+  users: {
+    async inviteUser(email, role = 'user') {
+      return apiFetch('/users/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email, role }),
+      });
+    },
+  },
+
+  integrations: {
+    Core: {
+      UploadFile: ({ file }) => uploadFile(file),
+      InvokeLLM: async () => {
+        throw new Error('Fonction IA non disponible en mode autonome');
+      },
+      SendEmail: async () => {
+        throw new Error('Envoi email non configuré — Phase 5');
+      },
+    },
+  },
+
   functions: {
     async invoke(name) {
       if (name === 'getGoogleMapsApiKey') {
-        return apiFetch('/config/google-maps-key');
+        const res = await apiFetch('/config/google-maps-key');
+        return { data: { apiKey: res.apiKey || res.data?.apiKey || '' } };
       }
       throw new Error(`Unknown function: ${name}`);
     },

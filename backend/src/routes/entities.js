@@ -6,16 +6,10 @@ import {
   splitIncomingRecord,
   matchesFilter,
   generateId,
+  sortRecords,
 } from '../lib/prisma.js';
 
 const router = Router();
-
-// Base44-compatible entity API
-// GET    /api/entities/:name          → list/filter
-// GET    /api/entities/:name/:id      → get one
-// POST   /api/entities/:name          → create
-// PUT    /api/entities/:name/:id      → update
-// DELETE /api/entities/:name/:id      → delete
 
 router.get('/:entityName', async (req, res) => {
   try {
@@ -25,29 +19,31 @@ router.get('/:entityName', async (req, res) => {
     }
 
     const delegate = getEntityDelegate(entityName);
-    const { q, sort, limit } = req.query;
+    const { q, sort, limit, skip } = req.query;
     const query = q ? JSON.parse(q) : {};
-    const take = limit ? parseInt(limit, 10) : undefined;
 
     const where = {};
     if (query.company_id) where.companyId = query.company_id;
 
     const rows = await delegate.findMany({
       where: Object.keys(where).length ? where : undefined,
-      take: take && !isNaN(take) ? take : undefined,
-      orderBy: sort?.startsWith('-')
-        ? { updatedAt: 'desc' }
-        : { updatedAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     let records = rows.map(toApiRecord);
 
-    // Apply remaining filters in-memory (JSON fields)
     const extraFilters = { ...query };
     delete extraFilters.company_id;
     if (Object.keys(extraFilters).length > 0) {
       records = records.filter((r) => matchesFilter(r, extraFilters));
     }
+
+    records = sortRecords(records, sort || '-created_date');
+
+    const skipN = skip ? parseInt(skip, 10) : 0;
+    const takeN = limit ? parseInt(limit, 10) : undefined;
+    if (skipN > 0) records = records.slice(skipN);
+    if (takeN && !isNaN(takeN)) records = records.slice(0, takeN);
 
     res.json(records);
   } catch (err) {
@@ -74,13 +70,14 @@ router.post('/:entityName', async (req, res) => {
     const delegate = getEntityDelegate(entityName);
     const parsed = splitIncomingRecord(req.body);
     const id = parsed.id || generateId();
+    const companyId = parsed.companyId || parsed.data?.company_id || req.user?.companyId || 'default';
 
     const row = await delegate.create({
       data: {
         id,
-        companyId: parsed.companyId || 'default',
-        data: parsed.data,
-        createdById: parsed.createdById,
+        companyId,
+        data: { ...parsed.data, company_id: companyId },
+        createdById: parsed.createdById || req.user?.sub,
         createdBy: parsed.createdBy,
         isSample: parsed.isSample,
       },

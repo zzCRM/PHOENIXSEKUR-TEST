@@ -112,6 +112,20 @@ export function matchesFilter(record, query) {
   });
 }
 
+export function sortRecords(records, sort) {
+  if (!sort) return records;
+  const desc = sort.startsWith('-');
+  const field = desc ? sort.slice(1) : sort;
+
+  return [...records].sort((a, b) => {
+    const av = a[field] ?? '';
+    const bv = b[field] ?? '';
+    if (av === bv) return 0;
+    const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    return desc ? -cmp : cmp;
+  });
+}
+
 export function generateId() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
