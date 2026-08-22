@@ -75,7 +75,7 @@ const MODULES = [
 const NOTIFS = [
   { key: 'notif_rapport_rondes', label: 'Rapports de rondes par email' },
   { key: 'notif_main_courante', label: 'Rapports de main courante par email' },
-  { key: 'notif_rapport_auto', label: 'Rapport automatique quotidien' },
+  { key: 'notif_rapport_auto', label: 'Recevoir les rapports de sécurité automatiques par email' },
   { key: 'notif_documents', label: 'Documents envoyés par email' },
 ];
 

@@ -93,6 +93,7 @@ export default function PriseDeServiceNFC({ mission, companyId, agentId, agentNa
       start_latitude: position?.latitude,
       start_longitude: position?.longitude,
       nfc_validated: false,
+      certified: true,
     });
 
     await base44.entities.MainCourante.create({
@@ -105,9 +106,10 @@ export default function PriseDeServiceNFC({ mission, companyId, agentId, agentNa
       date: today,
       time: now,
       type: 'arrivee',
-      content: `Prise de service - ${agentName} a pris son service sur ${mission.site_name} à ${now}`,
+      content: `Prise de service certifiée (photo + GPS) — ${agentName} sur ${mission.site_name} à ${now}`,
       latitude: position?.latitude,
       longitude: position?.longitude,
+      photo_url: photoUploadUrl,
       severity: 'normal',
     });
 

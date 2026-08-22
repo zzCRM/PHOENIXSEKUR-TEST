@@ -1,0 +1,19 @@
+{
+  "name": "Phoenix Sekur",
+  "short_name": "Phoenix",
+  "description": "Application agents — planning, rondes, PTI, main courante",
+  "start_url": "/espace-agent",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#c0392b",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/phoenix-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

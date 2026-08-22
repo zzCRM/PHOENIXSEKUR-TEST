@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & multi-tenant ───────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          String   @default("admin") // admin | agent | client | superadmin
+  companyId     String   @map("company_id")
+  firstName     String?  @map("first_name")
+  lastName      String?  @map("last_name")
+  isActive      Boolean  @default(true) @map("is_active")
+  suspendReason String?  @map("suspend_reason")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([companyId])
+  @@map("users")
+}
+
+model Invitation {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  email      String
+  role       String    @default("user")
+  companyId  String    @map("company_id")
+  invitedBy  String?   @map("invited_by")
+  expiresAt  DateTime  @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("invitations")
+}
+
+model PlatformSettings {
+  id        String   @id @default("default")
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+model SignupRequest {
+  id          String    @id @default(cuid())
+  email       String
+  companyName String?   @map("company_name")
+  firstName   String?   @map("first_name")
+  lastName    String?   @map("last_name")
+  phone       String?
+  message     String?
+  status      String    @default("pending") // pending | approved | rejected
+  trialDays   Int       @default(14) @map("trial_days")
+  trialEndsAt DateTime? @map("trial_ends_at")
+  companyId   String?   @map("company_id")
+  reviewedBy  String?   @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([email])
+  @@map("signup_requests")
+}
+
+model CompanySubscription {
+  companyId     String    @id @map("company_id")
+  status        String    @default("trial") // trial | active | suspended
+  plan          String    @default("trial")
+  trialEndsAt   DateTime? @map("trial_ends_at")
+  suspendedAt   DateTime? @map("suspended_at")
+  suspendReason String?   @map("suspend_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("company_subscriptions")
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  email     String
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([email])
+  @@index([token])
+  @@map("password_resets")
+}
+
+// ─── Entity tables (mirrors Base44 entities) ───────────────────────────────
+// Each row stores scalar index fields + JSON payload for full Base44 compatibility.
+
+model Agent {
+  id          String   @id
+  companyId   String   @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("agents")
+}
+
+model Alerte {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("alertes")
+}
+
+model BonIntervention {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("bon_interventions")
+}
+
+model CahierConsignes {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("cahier_consignes")
+}
+
+model Client {
+  id          String   @id
+  companyId   String   @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("clients")
+}
+
+model CompanySettings {
+  id          String   @id
+  companyId   String   @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("company_settings")
+}
+
+model Conge {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("conges")
+}
+
+model Contrat {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("contrats")
+}
+
+model Demande {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("demandes")
+}
+
+model Document {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("documents")
+}
+
+model FicheDePaie {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("fiches_de_paie")
+}
+
+model Geolocation {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("geolocations")
+}
+
+model Invoice {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("invoices")
+}
+
+model Lead {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("leads")
+}
+
+model MainCourante {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("main_courante")
+}
+
+model Mission {
+  id          String   @id
+  companyId   String   @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("missions")
+}
+
+model PostePlanning {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("poste_planning")
+}
+
+model PretMateriel {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("pret_materiel")
+}
+
+model PriseDeService {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("prise_de_service")
+}
+
+model Ronde {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("rondes")
+}
+
+model RondeExecution {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("ronde_executions")
+}
+
+model Site {
+  id          String   @id
+  companyId   String   @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("sites")
+}
+
+model AppUser {
+  id          String   @id
+  companyId   String?  @map("company_id")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@index([companyId])
+  @@map("app_users")
+}

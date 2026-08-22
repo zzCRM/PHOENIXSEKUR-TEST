@@ -6,9 +6,8 @@ import {
   BookOpen, Route, BarChart3, MessageSquare,
   Navigation, UserPlus, CalendarDays,
   FileSignature, ClipboardCheck, Clock, ScanLine,
-  ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock
+  ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock, Wallet
 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -65,6 +64,7 @@ const baseNavGroups = [
     items: [
       { icon: Users, label: 'Collaborateurs', path: '/agents' },
       { icon: Clock, label: 'Heures', path: '/heures-collaborateurs' },
+      { icon: Wallet, label: 'Prépaie', path: '/prepaie' },
       { icon: CalendarDays, label: 'Demandes', path: '/conges' },
     ]
   },
@@ -76,15 +76,33 @@ const baseNavGroups = [
   },
 ];
 
-const getNavGroups = (isPlatformOwner) => {
-  const groups = [...baseNavGroups];
-  if (isPlatformOwner) {
+const getNavGroups = (isPlatformOwner, isAdmin, isSuperAdminUser) => {
+  const groups = [];
+  if (isSuperAdminUser) {
+    groups.push({
+      label: 'Plateforme',
+      items: [
+        { icon: ShieldCheck, label: 'Super Admin', path: '/super-admin' },
+        { icon: UserPlus, label: 'Onboarding société', path: '/onboarding' },
+      ],
+    });
+  }
+  groups.push(...baseNavGroups);
+  if (isAdmin) {
+    groups.push({
+      label: 'Administration',
+      items: [
+        { icon: UserPlus, label: 'Inviter utilisateurs', path: '/inviter' },
+        { icon: ShieldCheck, label: 'Facturation', path: '/facturation' },
+      ],
+    });
+  }
+  if (isPlatformOwner && !isSuperAdminUser) {
     groups.push({
       label: 'Admin',
       items: [
         { icon: UserPlus, label: 'Onboarding', path: '/onboarding' },
-        { icon: ShieldCheck, label: 'Facturation', path: '/facturation' },
-      ]
+      ],
     });
   }
   return groups;
@@ -92,10 +110,12 @@ const getNavGroups = (isPlatformOwner) => {
 
 export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   
   const PLATFORM_OWNER_EMAIL = 'contact@ppsecurity.fr';
   const isPlatformOwner = user?.email === PLATFORM_OWNER_EMAIL;
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdminUser = !!user?.superadmin;
 
   const handleLinkClick = () => {
     if (onMobileClose) {
@@ -130,7 +150,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-4 overflow-y-auto">
-        {getNavGroups(isPlatformOwner).map((group) => (
+        {getNavGroups(isPlatformOwner, isAdmin, isSuperAdminUser).map((group) => (
           <div key={group.label}>
             {!collapsed && (
               <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40">
@@ -174,7 +194,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
           {!collapsed && <span>Réduire</span>}
         </button>
         <button
-          onClick={() => base44.auth.logout()}
+          onClick={() => logout()}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive w-full transition-all"
         >
           <LogOut className="w-5 h-5" />

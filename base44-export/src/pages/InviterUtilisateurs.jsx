@@ -22,6 +22,7 @@ export default function InviterUtilisateurs() {
   const [inviteType, setInviteType] = useState('agent'); // 'agent' or 'client'
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
+  const [inviteLink, setInviteLink] = useState(null);
   const [error, setError] = useState(null);
   const { companyId, isAdmin } = useCompany();
 
@@ -33,9 +34,9 @@ export default function InviterUtilisateurs() {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setInviteLink(null);
     try {
-      // Invite user to platform
-      await base44.users.inviteUser(email, role === 'admin' ? 'admin' : 'user');
+      const result = await base44.users.inviteUser(email, role === 'admin' ? 'admin' : 'user');
       
       // If inviting a client, create client record automatically
       if (inviteType === 'client' && companyId) {
@@ -50,7 +51,14 @@ export default function InviterUtilisateurs() {
         }
       }
       
-      setSuccess(`Invitation envoyée à ${email}`);
+      if (result.email_sent) {
+        setSuccess(`Invitation envoyée par email à ${email}`);
+      } else if (result.message) {
+        setSuccess(result.message);
+        if (result.invite_url) setInviteLink(result.invite_url);
+      } else {
+        setSuccess(`Invitation créée pour ${email}`);
+      }
       setEmail('');
     } catch (e) {
       setError(e.message || 'Erreur lors de l\'invitation');
@@ -130,9 +138,16 @@ export default function InviterUtilisateurs() {
           </div>
 
           {success && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              {success}
+            <div className="flex flex-col gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                {success}
+              </div>
+              {inviteLink && (
+                <p className="text-xs break-all">
+                  Lien à transmettre manuellement : {inviteLink}
+                </p>
+              )}
             </div>
           )}
           {error && (
