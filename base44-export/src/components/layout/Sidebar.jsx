@@ -8,7 +8,6 @@ import {
   FileSignature, ClipboardCheck, Clock, ScanLine,
   ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock
 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 
