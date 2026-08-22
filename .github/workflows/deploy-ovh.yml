@@ -1,6 +1,4 @@
-# Déploiement automatique OVH — comme Base44 / Cursor
-# À chaque push sur main, le VPS se met à jour tout seul.
-# Vous n'avez plus besoin de KVM ni de taper des commandes.
+# Déploiement automatique OVH — comme Phoenix CRM sur Hetzner
 
 name: Deploy Phoenix Sekur (OVH)
 
@@ -13,12 +11,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Prepare SSH key
+        env:
+          KEY_B64: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$KEY_B64" ]; then
+            echo "❌ Secret VPS_SSH_KEY manquant"
+            exit 1
+          fi
+          echo "$KEY_B64" | base64 -d > deploy_key
+          chmod 600 deploy_key
+          ssh-keygen -y -f deploy_key > /dev/null
+          echo "✅ Clé SSH valide"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key_path: deploy_key
+          command_timeout: 20m
           script: |
             set -e
             cd /opt/phoenixsekur
