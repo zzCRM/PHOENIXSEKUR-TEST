@@ -183,11 +183,32 @@ export const phoenix = {
   },
 
   users: {
+    async list() {
+      return apiFetch('/users');
+    },
     async inviteUser(email, role = 'user') {
       return apiFetch('/users/invite', {
         method: 'POST',
         body: JSON.stringify({ email, role }),
       });
+    },
+    async updateUser(id, data) {
+      return apiFetch(`/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    async deleteUser(id) {
+      return apiFetch(`/users/${id}`, { method: 'DELETE' });
+    },
+    async resendInvitation(id) {
+      return apiFetch(`/users/invitations/${id}/resend`, { method: 'POST' });
+    },
+    async deleteInvitation(id) {
+      return apiFetch(`/users/invitations/${id}`, { method: 'DELETE' });
+    },
+    async smtpStatus() {
+      return apiFetch('/users/smtp-status');
     },
   },
 

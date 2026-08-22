@@ -24,7 +24,7 @@ export default function CompanyHeader() {
   const company = settings?.[0];
 
   return (
-    <div className="hidden lg:flex bg-slate-600 text-white px-6 py-4 items-center justify-between">
+    <div className="hidden xl:flex bg-slate-600 text-white px-6 py-4 items-center justify-between">
       <div className="flex items-center gap-4">
         {company?.logo_url ? (
           <img

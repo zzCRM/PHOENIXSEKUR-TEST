@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
-import { createAndSendInvitation, roleLabel } from '../lib/invitations.js';
+import { createAndSendInvitation, resendInvitation, roleLabel } from '../lib/invitations.js';
 import { getSmtpStatus, isEmailConfigured } from '../lib/email.js';
 
 const router = Router();
@@ -11,22 +11,108 @@ function resolveInviteRole(role) {
   const r = String(role || 'user').toLowerCase();
   if (r === 'admin' || r === 'superadmin') return 'admin';
   if (r === 'client') return 'client';
-  if (r === 'agent' || r === 'collaborateur') return 'user';
+  if (r === 'agent' || r === 'collaborateur' || r === 'user') return 'user';
   return 'user';
 }
 
-// Remplace base44.users.inviteUser — envoie un email avec lien de création de compte
-router.post('/invite', requireAuth, async (req, res) => {
+function requireCompanyAdmin(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Non authentifié' });
+  if (isSuperAdmin(req.user) || req.user.role === 'admin') return next();
+  return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+}
+
+function companyScope(req) {
+  if (isSuperAdmin(req.user) && (req.query.company_id || req.body?.company_id)) {
+    return req.query.company_id || req.body.company_id;
+  }
+  return req.user.companyId;
+}
+
+router.get('/smtp-status', requireAuth, requireCompanyAdmin, (_req, res) => {
+  res.json(getSmtpStatus());
+});
+
+// Liste comptes + invitations (portail entreprise)
+router.get('/', requireAuth, requireCompanyAdmin, async (req, res) => {
+  try {
+    const companyId = companyScope(req);
+    if (!companyId && !isSuperAdmin(req.user)) {
+      return res.status(403).json({ error: 'Société requise' });
+    }
+
+    const whereUser = companyId ? { companyId } : {};
+    const whereInvite = {
+      acceptedAt: null,
+      ...(companyId ? { companyId } : {}),
+    };
+
+    const [users, invitations] = await Promise.all([
+      prisma.user.findMany({
+        where: whereUser,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          companyId: true,
+          firstName: true,
+          lastName: true,
+          isActive: true,
+          createdAt: true,
+        },
+      }),
+      prisma.invitation.findMany({
+        where: whereInvite,
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+
+    res.json({
+      users: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        role_label: roleLabel(u.role),
+        company_id: u.companyId,
+        first_name: u.firstName,
+        last_name: u.lastName,
+        is_active: u.isActive,
+        status: u.isActive ? 'actif' : 'inactif',
+        created_at: u.createdAt,
+        type: 'user',
+      })),
+      invitations: invitations.map((i) => ({
+        id: i.id,
+        email: i.email,
+        role: i.role,
+        role_label: roleLabel(i.role),
+        company_id: i.companyId,
+        invited_by: i.invitedBy,
+        expires_at: i.expiresAt,
+        expired: i.expiresAt < new Date(),
+        status: i.expiresAt < new Date() ? 'expirée' : 'en_attente',
+        created_at: i.createdAt,
+        type: 'invitation',
+      })),
+      smtp: getSmtpStatus(),
+    });
+  } catch (err) {
+    console.error('List users error:', err);
+    res.status(500).json({ error: err.message || 'Impossible de lister les utilisateurs' });
+  }
+});
+
+router.post('/invite', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
     const { email, role = 'user' } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email requis' });
-    }
+    if (!email) return res.status(400).json({ error: 'Email requis' });
 
     const superadmin = isSuperAdmin(req.user);
     if (!superadmin && !req.user.companyId) {
       return res.status(403).json({ error: 'Société requise' });
     }
+
     const companyId = req.body.company_id || req.user.companyId;
     const appRole = resolveInviteRole(role);
     const normalizedEmail = email.trim().toLowerCase();
@@ -53,7 +139,7 @@ router.post('/invite', requireAuth, async (req, res) => {
     if (emailSent) {
       message = `Invitation envoyée par email à ${normalizedEmail}`;
     } else if (emailReason === 'smtp_not_configured') {
-      message = `Invitation créée, mais l'email n'a pas pu être envoyé (SMTP non configuré). Copiez le lien ci-dessous.`;
+      message = `Invitation créée, mais l'email n'a pas pu être envoyé (SMTP non chargé sur le serveur). Copiez le lien ci-dessous.`;
     } else if (emailReason === 'smtp_error') {
       message = `Invitation créée, mais l'envoi email a échoué : ${emailError || 'erreur SMTP'}. Copiez le lien ci-dessous.`;
     } else {
@@ -68,7 +154,6 @@ router.post('/invite', requireAuth, async (req, res) => {
       email_sent: emailSent,
       email_reason: emailReason || null,
       email_error: emailError || null,
-      // Toujours renvoyer le lien (utile si le mail n'arrive pas / spam)
       invite_url: inviteUrl,
       smtp_configured: isEmailConfigured(),
       message,
@@ -79,11 +164,90 @@ router.post('/invite', requireAuth, async (req, res) => {
   }
 });
 
-router.get('/smtp-status', requireAuth, (req, res) => {
-  if (!isSuperAdmin(req.user) && req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Accès refusé' });
+router.post('/invitations/:id/resend', requireAuth, requireCompanyAdmin, async (req, res) => {
+  try {
+    const invitation = await prisma.invitation.findUnique({ where: { id: req.params.id } });
+    if (!invitation) return res.status(404).json({ error: 'Invitation introuvable' });
+    if (!isSuperAdmin(req.user) && invitation.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const result = await resendInvitation(invitation.id, req.user.email);
+    res.json({
+      success: true,
+      email_sent: result.emailSent,
+      email_reason: result.emailReason || null,
+      email_error: result.emailError || null,
+      invite_url: result.inviteUrl,
+      smtp_configured: isEmailConfigured(),
+      message: result.emailSent
+        ? 'Invitation renvoyée par email'
+        : `Email non envoyé (${result.emailReason || 'smtp'}). Copiez le lien.`,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Renvoi impossible' });
   }
-  res.json(getSmtpStatus());
+});
+
+router.delete('/invitations/:id', requireAuth, requireCompanyAdmin, async (req, res) => {
+  try {
+    const invitation = await prisma.invitation.findUnique({ where: { id: req.params.id } });
+    if (!invitation) return res.status(404).json({ error: 'Invitation introuvable' });
+    if (!isSuperAdmin(req.user) && invitation.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    await prisma.invitation.delete({ where: { id: invitation.id } });
+    res.json({ success: true, deleted: invitation.email });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Suppression impossible' });
+  }
+});
+
+router.patch('/:id', requireAuth, requireCompanyAdmin, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    if (!isSuperAdmin(req.user) && user.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const data = {};
+    if (typeof req.body.is_active === 'boolean') data.isActive = req.body.is_active;
+    if (req.body.role) data.role = resolveInviteRole(req.body.role);
+
+    const updated = await prisma.user.update({ where: { id: user.id }, data });
+    res.json({
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
+      is_active: updated.isActive,
+      status: updated.isActive ? 'actif' : 'inactif',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Mise à jour impossible' });
+  }
+});
+
+router.delete('/:id', requireAuth, requireCompanyAdmin, async (req, res) => {
+  try {
+    if (req.params.id === req.user.sub) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
+    if (!isSuperAdmin(req.user) && user.companyId !== req.user.companyId) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    if (user.role === 'superadmin' && !isSuperAdmin(req.user)) {
+      return res.status(403).json({ error: 'Impossible de supprimer un super admin' });
+    }
+
+    await prisma.user.delete({ where: { id: user.id } });
+    res.json({ success: true, deleted: user.email });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Suppression impossible' });
+  }
 });
 
 export default router;

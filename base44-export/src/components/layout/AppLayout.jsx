@@ -14,27 +14,27 @@ export default function AppLayout() {
   const { logout, user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop sidebar */}
+    <div className="min-h-[100dvh] bg-background">
+      {/* Desktop sidebar — xl+ only (tablettes = tiroir mobile avec déconnexion visible) */}
       <aside className={cn(
-        'fixed left-0 top-0 h-screen z-50 transition-all duration-300 hidden lg:block',
+        'fixed left-0 top-0 h-[100dvh] z-50 transition-all duration-300 hidden xl:block',
         collapsed ? 'w-[72px]' : 'w-[240px]',
       )}>
         <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
       </aside>
 
-      {/* Mobile overlay */}
+      {/* Mobile / tablet overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 xl:hidden"
           onClick={() => setMobileOpen(false)}
           aria-hidden
         />
       )}
 
-      {/* Mobile drawer */}
+      {/* Mobile / tablet drawer */}
       <aside className={cn(
-        'fixed left-0 top-0 h-[100dvh] w-[min(100vw-3rem,300px)] z-50 transition-transform duration-300 lg:hidden shadow-2xl',
+        'fixed left-0 top-0 h-[100dvh] w-[min(100vw-2.5rem,300px)] z-50 transition-transform duration-300 xl:hidden shadow-2xl',
         mobileOpen ? 'translate-x-0' : '-translate-x-full',
       )}>
         <Sidebar
@@ -45,11 +45,11 @@ export default function AppLayout() {
       </aside>
 
       <div className={cn(
-        'min-h-screen transition-all duration-300',
-        collapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]',
+        'min-h-[100dvh] transition-all duration-300',
+        collapsed ? 'xl:ml-[72px]' : 'xl:ml-[240px]',
       )}>
-        {/* Mobile top bar */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-gray-200">
+        {/* Top bar — visible jusqu'à xl (mobile + tablette) */}
+        <header className="xl:hidden sticky top-0 z-30 bg-white border-b border-gray-200">
           <div className="flex items-center gap-2 px-3 py-2.5">
             <button
               type="button"
@@ -89,9 +89,22 @@ export default function AppLayout() {
           </div>
         </header>
 
+        {/* Barre desktop : déconnexion toujours accessible */}
+        <div className="hidden xl:flex items-center justify-end gap-2 px-6 py-2 border-b border-gray-100 bg-white/80">
+          <span className="text-xs text-muted-foreground truncate max-w-[280px]">{user?.email}</span>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Déconnexion
+          </button>
+        </div>
+
         <CompanyHeader />
 
-        <main className="p-3 sm:p-4 lg:p-8 max-w-[100vw] overflow-x-hidden">
+        <main className="p-3 sm:p-4 xl:p-8 max-w-[100vw] overflow-x-hidden">
           <Outlet />
         </main>
       </div>

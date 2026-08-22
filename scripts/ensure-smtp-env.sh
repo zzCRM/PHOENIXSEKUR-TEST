@@ -21,6 +21,7 @@ keys = {
     "SMTP_PORT": os.environ.get("SMTP_PORT", "587"),
     "SMTP_USER": os.environ.get("SMTP_USER", "contact@phoenixsekur.com"),
     "SMTP_PASS": os.environ.get("SMTP_PASS") or os.environ.get("SMTP_PASSWORD", ""),
+    "SMTP_PASSWORD": os.environ.get("SMTP_PASS") or os.environ.get("SMTP_PASSWORD", ""),
     "SMTP_FROM": os.environ.get("SMTP_FROM", "Phoenix Sekur <contact@phoenixsekur.com>"),
     "APP_URL": os.environ.get("APP_URL", "https://app.phoenixsekur.com"),
 }
@@ -28,7 +29,7 @@ keys = {
 content = open(path, encoding="utf-8").read()
 
 for key, val in keys.items():
-    if key == "SMTP_PASS" and not val:
+    if key in ("SMTP_PASS", "SMTP_PASSWORD") and not val:
         continue
     # Guillemets obligatoires : SMTP_FROM contient < > et casse "source .env"
     escaped = val.replace("\\", "\\\\").replace('"', '\\"')

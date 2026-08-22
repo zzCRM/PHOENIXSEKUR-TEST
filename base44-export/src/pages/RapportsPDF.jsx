@@ -228,7 +228,7 @@ export default function RapportsPDF() {
       const fileName = `rapport-securite-${start}-${end}.pdf`;
       const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-      const stats = {
+      const reportStats = {
         rondes: data.rondes?.length || 0,
         main_courante: data.main_courante?.length || 0,
         incidents: data.incidents?.length || 0,
@@ -247,7 +247,7 @@ export default function RapportsPDF() {
           start,
           end,
           modules: activeModules,
-          stats,
+          stats: reportStats,
           company_name: settings[0]?.company_name,
           save_schedule: autoSchedule,
           schedule: autoSchedule ? {
