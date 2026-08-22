@@ -28,6 +28,7 @@ mv vitrine/public/config.runtime.js vitrine/public/config.js
 export VITRINE_DOMAIN="${VITRINE_DOMAIN:-www.phoenixsekur.com}"
 export ROOT_DOMAIN="${ROOT_DOMAIN:-phoenixsekur.com}"
 bash scripts/ensure-vitrine-env.sh .env.production 2>/dev/null || true
+bash scripts/ensure-superadmin-env.sh .env.production 2>/dev/null || true
 envsubst '${DOMAIN} ${VITRINE_DOMAIN} ${ROOT_DOMAIN} ${ACME_EMAIL}' < Caddyfile.template > Caddyfile
 
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
