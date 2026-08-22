@@ -33,8 +33,16 @@ envsubst '${DOMAIN} ${VITRINE_DOMAIN} ${ROOT_DOMAIN} ${ACME_EMAIL}' < Caddyfile.
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 
 echo ""
-echo "⏳ Attente démarrage (40s)..."
-sleep 40
+echo "📋 Caddyfile actif:"
+cat Caddyfile
+
+echo ""
+echo "🔄 Redémarrage Caddy (certificats SSL www + apex)..."
+docker compose -f docker-compose.prod.yml --env-file .env.production restart caddy
+
+echo ""
+echo "⏳ Attente démarrage (45s)..."
+sleep 45
 
 if docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend wget -qO- http://localhost:3001/health 2>/dev/null | grep -q ok; then
   echo "✅ Backend OK"
@@ -42,6 +50,10 @@ else
   echo "⚠️  Backend en erreur — logs:"
   docker compose -f docker-compose.prod.yml --env-file .env.production logs backend --tail 40
 fi
+
+echo ""
+echo "📋 Logs Caddy (SSL):"
+docker compose -f docker-compose.prod.yml --env-file .env.production logs caddy --tail 30 2>/dev/null || true
 
 echo ""
 echo "✅ Déployé !"
