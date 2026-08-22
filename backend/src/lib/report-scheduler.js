@@ -141,12 +141,12 @@ export async function runScheduledReports({ force = false, companyId = null } = 
           ].join('\n');
 
           for (const to of emails) {
-            await sendReportEmail({
+            const result = await sendReportEmail({
               to,
               subject: `[Auto] Rapport sécurité — ${client.company_name || 'Client'} (${start} → ${end})`,
               text,
             });
-            sentCount += 1;
+            if (result.sent) sentCount += 1;
           }
         }
       }
