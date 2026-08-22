@@ -11,48 +11,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Prepare SSH key (si pas de mot de passe)
-        if: ${{ secrets.VPS_PASSWORD == '' }}
-        env:
-          KEY_INPUT: ${{ secrets.VPS_SSH_KEY }}
-        run: |
-          if [ -z "$KEY_INPUT" ]; then
-            echo "❌ Ajoutez VPS_PASSWORD ou VPS_SSH_KEY dans GitHub Secrets"
-            exit 1
-          fi
-          if echo "$KEY_INPUT" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
-            echo "$KEY_INPUT" > deploy_key
-          else
-            echo "$KEY_INPUT" | tr -d ' \n\r\t' | base64 -d > deploy_key
-          fi
-          chmod 600 deploy_key
-          ssh-keygen -y -f deploy_key > /dev/null
-          echo "✅ Clé SSH valide"
-
-      - name: Deploy via SSH (mot de passe)
-        if: ${{ secrets.VPS_PASSWORD != '' }}
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          command_timeout: 20m
-          script: |
-            set -e
-            cd /opt/phoenixsekur
-            git fetch origin
-            git checkout cursor/migrate-off-base44-6bc2 || git checkout main
-            git pull
-            docker compose -f docker-compose.prod.yml up -d --build
-            echo "✅ Déployé $(date)"
-
-      - name: Deploy via SSH (clé)
-        if: ${{ secrets.VPS_PASSWORD == '' }}
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key_path: deploy_key
           command_timeout: 20m
           script: |
             set -e
