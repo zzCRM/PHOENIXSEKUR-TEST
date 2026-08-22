@@ -201,8 +201,8 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
   const selectedSite = sites.find(s => s.id === form.site_id);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm pt-6 pb-6 px-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[92vh] overflow-hidden ring-1 ring-black/5">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-start justify-center bg-black/40 backdrop-blur-sm sm:pt-6 sm:pb-6 px-0 sm:px-4 overflow-y-auto">
+      <div className="bg-white sm:rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh] overflow-hidden ring-1 ring-black/5">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center gap-3">
@@ -223,7 +223,7 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
         </div>
 
         {/* Sub-header info chips */}
-        <div className="grid grid-cols-3 gap-px bg-slate-100 border-b border-slate-100">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-slate-100 border-b border-slate-100">
           <div className="bg-white px-5 py-3 flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
               <MapPin className="w-4 h-4 text-emerald-600" />
@@ -255,9 +255,31 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar tabs */}
-          <div className="w-48 shrink-0 bg-emerald-50/40 border-r border-slate-100 py-4 flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Tabs mobiles */}
+          <div className="md:hidden flex overflow-x-auto border-b bg-emerald-50/50 shrink-0">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    'shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2',
+                    active ? 'border-emerald-600 text-emerald-700 bg-white' : 'border-transparent text-slate-500'
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sidebar tabs desktop */}
+          <div className="hidden md:flex w-48 shrink-0 bg-emerald-50/40 border-r border-slate-100 py-4 flex-col gap-1">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const active = activeTab === tab.key;
@@ -267,6 +289,7 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
               return (
                 <button
                   key={tab.key}
+                  type="button"
                   onClick={() => setActiveTab(tab.key)}
                   className={cn(
                     'mx-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all',
@@ -289,7 +312,7 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-6 space-y-6 bg-white min-w-0">
             {activeTab === 'general' && (
               <>
                 <div className="flex justify-end gap-2">
@@ -617,22 +640,21 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-          <label htmlFor="planifier-visible" className="flex items-center gap-2 cursor-pointer">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 sm:px-6 py-3 sm:py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+          <label htmlFor="planifier-visible" className="flex items-center gap-2 cursor-pointer min-w-0">
             <input
               type="checkbox"
               id="planifier-visible"
               checked={form.planifier_visible}
               onChange={e => set('planifier_visible', e.target.checked)}
-              className="rounded w-4 h-4 accent-emerald-600"
+              className="rounded w-4 h-4 accent-emerald-600 shrink-0"
             />
-            <span className="text-xs text-slate-600 font-medium">Planifier - Afficher aux collaborateurs</span>
-            <Info className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-xs text-slate-600 font-medium leading-snug">Planifier — afficher aux collaborateurs</span>
           </label>
           <Button
             onClick={handleSave}
             disabled={createMut.isPending}
-            className="bg-slate-800 hover:bg-slate-900 text-white px-8 py-2.5 rounded-lg font-semibold shadow-md transition-colors"
+            className="bg-slate-800 hover:bg-slate-900 text-white sm:px-8 py-2.5 rounded-lg font-semibold shadow-md transition-colors w-full sm:w-auto"
           >
             {createMut.isPending ? 'Enregistrement...' : 'ENREGISTRER'}
           </Button>

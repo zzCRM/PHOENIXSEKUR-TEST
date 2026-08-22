@@ -196,30 +196,49 @@ function RondeFormDialog({ open, onClose, onSubmit, ronde, sites, allNfcCheckpoi
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-3xl max-h-[100dvh] sm:max-h-[92vh] overflow-hidden p-0 flex flex-col gap-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <div className="w-5 h-5 rounded bg-muted flex items-center justify-center">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b shrink-0 gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold min-w-0">
+            <div className="w-5 h-5 rounded bg-muted flex items-center justify-center shrink-0">
               <FileText className="w-3 h-3" />
             </div>
-            {ronde ? 'Modifier la ronde' : "Ajout d'une ronde"}
-            <Info className="w-4 h-4 text-muted-foreground" />
+            <span className="truncate">{ronde ? 'Modifier la ronde' : "Ajout d'une ronde"}</span>
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar */}
-          <div className="w-44 shrink-0 border-r bg-muted/10 py-3">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Tabs mobiles */}
+          <div className="md:hidden flex border-b bg-muted/20 shrink-0">
             {TABS.map(tab => (
               <button
                 key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'flex-1 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
+                  activeTab === tab.key
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sidebar desktop */}
+          <div className="hidden md:block w-44 shrink-0 border-r bg-muted/10 py-3">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
                   'w-full text-left px-4 py-2.5 text-sm transition-colors',
                   activeTab === tab.key
                     ? 'border-l-2 border-primary bg-primary/5 text-primary font-medium'
-                    : 'text-muted-foreground hover:bg-muted/30'
+                    : 'text-muted-foreground hover:bg-muted/30',
                 )}
               >
                 {tab.label}
@@ -228,11 +247,11 @@ function RondeFormDialog({ open, onClose, onSubmit, ronde, sites, allNfcCheckpoi
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5 space-y-6 min-w-0">
             {activeTab === 'general' && (
               <>
                 {/* Site / Client */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs mb-1.5 block">Client</Label>
                     <Input value={form.client_name} readOnly placeholder="— auto via site —" className="bg-muted/30" />
@@ -305,9 +324,9 @@ function RondeFormDialog({ open, onClose, onSubmit, ronde, sites, allNfcCheckpoi
             )}
 
             {activeTab === 'points' && (
-              <div className="flex gap-0 -mx-5 -mb-5" style={{ minHeight: 400 }}>
+              <div className="flex flex-col lg:flex-row gap-0 -mx-3 sm:-mx-5 -mb-3 sm:-mb-5 min-h-[320px]">
                 {/* LEFT: selected checkpoints in this ronde */}
-                <div className="w-1/2 border-r flex flex-col">
+                <div className="w-full lg:w-1/2 lg:border-r border-b lg:border-b-0 flex flex-col min-h-[220px]">
                   {/* 3 tabs: RONDE / LISTE / CARTE */}
                   <div className="flex border-b">
                     {['RONDE', 'LISTE', 'CARTE'].map(t => (
@@ -348,7 +367,7 @@ function RondeFormDialog({ open, onClose, onSubmit, ronde, sites, allNfcCheckpoi
                 </div>
 
                 {/* RIGHT: available checkpoints from site */}
-                <div className="w-1/2 flex flex-col">
+                <div className="w-full lg:w-1/2 flex flex-col min-h-[220px]">
                   <div className="p-3 border-b">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Points disponibles{form.site_id ? '' : ' (sélectionnez un site)'}</p>
                   </div>
@@ -402,12 +421,12 @@ function RondeFormDialog({ open, onClose, onSubmit, ronde, sites, allNfcCheckpoi
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t bg-muted/10">
-          <Button variant="outline" onClick={onClose}>Annuler</Button>
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2 sm:gap-3 px-3 sm:px-5 py-3 border-t bg-muted/10 shrink-0">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
           <Button
             onClick={() => form.name && onSubmit(form)}
             disabled={!form.name}
-            className="bg-gray-700 hover:bg-gray-800 text-white px-8"
+            className="bg-gray-700 hover:bg-gray-800 text-white sm:px-8 w-full sm:w-auto"
           >
             ENREGISTRER
           </Button>
@@ -444,17 +463,16 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[92vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-4xl max-h-[100dvh] sm:max-h-[92vh] overflow-hidden p-0 flex flex-col gap-0">
         {/* Header */}
-        <div className="flex items-center gap-2 px-5 py-3 border-b">
-          <Pencil className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">{checkpoint ? 'Modifier le point de contrôle' : "Ajout d'un point de contrôle"}</span>
-          <Info className="w-4 h-4 text-muted-foreground ml-1" />
+        <div className="flex items-center gap-2 px-3 sm:px-5 py-3 border-b shrink-0 min-w-0">
+          <Pencil className="w-4 h-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-semibold truncate">{checkpoint ? 'Modifier le point de contrôle' : "Ajout d'un point de contrôle"}</span>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
           {/* Left panel */}
-          <div className="w-1/2 border-r overflow-y-auto p-5 space-y-4">
+          <div className="w-full md:w-1/2 md:border-r overflow-y-auto overscroll-contain p-3 sm:p-5 space-y-4 min-w-0">
             {/* NFC + Géolocalisation */}
             <NfcCheckpointCapture
               initialNfc={form.nfc_tag_id}
@@ -473,13 +491,13 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
             {/* Description section */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center shrink-0">
                   <FileText className="w-4 h-4 text-white" />
                 </div>
                 <h3 className="font-semibold">Description</h3>
               </div>
               <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="border rounded-md px-3 py-2 bg-muted/20">
                     <Input value={form.name} onChange={e => update('name', e.target.value)} placeholder="Titre" className="border-0 p-0 h-auto text-sm shadow-none focus-visible:ring-0 bg-transparent" />
                   </div>
@@ -491,7 +509,7 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
                   <span className="flex-1">Pièces jointes</span>
                   <span className="text-base opacity-50">📎</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-muted/20">
                     <span className="text-muted-foreground">⊞</span>
                     <Input value={form.batiment} onChange={e => update('batiment', e.target.value)} placeholder="Batiment" className="border-0 p-0 h-auto text-sm shadow-none focus-visible:ring-0 bg-transparent" />
@@ -511,12 +529,12 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
             {/* Attributs */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center shrink-0">
                   <div className="w-3 h-3 rounded-full border-2 border-white" />
                 </div>
                 <h3 className="font-semibold">Attributs</h3>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center gap-2">
                   <Switch checked={form.debut_mission} onCheckedChange={v => update('debut_mission', v)} />
                   <Label className="text-sm">Point de contrôle de début de mission</Label>
@@ -530,10 +548,10 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
           </div>
 
           {/* Right panel — map */}
-          <div className="w-1/2 bg-muted/10 flex flex-col items-center justify-center gap-3 p-4">
+          <div className="w-full md:w-1/2 bg-muted/10 flex flex-col items-center justify-center gap-3 p-4 min-h-[200px] border-t md:border-t-0">
             {form.latitude && form.longitude ? (
               <>
-                <div className="w-full h-48 rounded-xl overflow-hidden border bg-white flex items-center justify-center">
+                <div className="w-full h-40 sm:h-48 rounded-xl overflow-hidden border bg-white flex items-center justify-center">
                   <img
                     src={`https://maps.googleapis.com/maps/api/staticmap?center=${form.latitude},${form.longitude}&zoom=16&size=400x200&markers=color:red%7C${form.latitude},${form.longitude}&key=AIzaSyD-placeholder`}
                     alt="carte"
@@ -542,7 +560,7 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
                   />
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-xs font-mono text-muted-foreground">{form.latitude}, {form.longitude}</p>
+                  <p className="text-xs font-mono text-muted-foreground break-all">{form.latitude}, {form.longitude}</p>
                   <a
                     href={`https://maps.google.com/?q=${form.latitude},${form.longitude}`}
                     target="_blank"
@@ -557,18 +575,19 @@ function CheckpointFormDialog({ checkpoint, onClose, onSave }) {
               <div className="text-center text-muted-foreground space-y-2">
                 <MapPin className="w-12 h-12 mx-auto opacity-20" />
                 <p className="text-sm">Position GPS non capturée</p>
-                <p className="text-xs opacity-60">La géolocalisation se lance<br/>automatiquement à l'ouverture</p>
+                <p className="text-xs opacity-60">La géolocalisation se lance<br/>automatiquement à l&apos;ouverture</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end px-5 py-3 border-t bg-muted/10">
+        <div className="flex flex-col-reverse sm:flex-row justify-stretch sm:justify-end gap-2 px-3 sm:px-5 py-3 border-t bg-muted/10 shrink-0">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
           <Button
             onClick={() => form.name && onSave(form)}
             disabled={!form.name}
-            className="bg-gray-700 hover:bg-gray-800 text-white px-8 uppercase tracking-wide"
+            className="bg-gray-700 hover:bg-gray-800 text-white sm:px-8 uppercase tracking-wide w-full sm:w-auto"
           >
             Enregistrer
           </Button>

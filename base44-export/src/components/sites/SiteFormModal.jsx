@@ -121,7 +121,7 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl p-0 gap-0 max-h-[92vh] overflow-hidden [&>button]:hidden">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-5xl p-0 gap-0 max-h-[100dvh] sm:max-h-[92vh] overflow-hidden flex flex-col [&>button]:hidden">
         <DialogTitle className="sr-only">{site ? 'Modifier le site' : 'Ajout d\'un site'}</DialogTitle>
 
         {/* Header */}
@@ -139,13 +139,24 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
           </div>
         </div>
 
-        <div className="flex" style={{ height: 'calc(92vh - 132px)' }}>
-          {/* Sidebar nav */}
-          <aside className="w-56 shrink-0 border-r border-border bg-muted/30 overflow-y-auto py-3">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Tabs mobiles */}
+          <div className="md:hidden flex overflow-x-auto border-b bg-muted/30 shrink-0">
+            {NAV.map(item => (
+              <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 ${activeTab === item.id ? 'border-primary text-primary bg-card' : 'border-transparent text-muted-foreground'}`}>
+                <item.icon className="w-3.5 h-3.5" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sidebar nav desktop */}
+          <aside className="hidden md:block w-56 shrink-0 border-r border-border bg-muted/30 overflow-y-auto py-3">
             {NAV.map(item => {
               const active = activeTab === item.id;
               return (
-                <button key={item.id} onClick={() => setActiveTab(item.id)}
+                <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition-all border-l-2 ${active ? 'bg-card border-l-primary text-foreground' : 'border-l-transparent text-muted-foreground hover:bg-card/50 hover:text-foreground'}`}>
                   <item.icon className="w-4 h-4" />
                   {item.label}
@@ -155,13 +166,13 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
           </aside>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-7 py-6">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-7 py-4 sm:py-6 min-w-0">
             {activeTab === 'general' && (
               <form onSubmit={handleSubmit} className="space-y-8">
                 {/* Informations générales */}
                 <section>
                   <SectionHeader icon={InfoIcon} title="Informations générales" />
-                  <div className="grid grid-cols-[1fr_auto] gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 sm:gap-6">
                     <div className="space-y-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-medium">Nom du site *</Label>
@@ -344,15 +355,15 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-border bg-card">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 sm:px-6 py-3 border-t border-border bg-card shrink-0">
+          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
             <Info className="w-3.5 h-3.5" />
             Les champs marqués * sont obligatoires
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={onClose}>Annuler</Button>
-            <Button onClick={handleSubmit} className="bg-slate-700 hover:bg-slate-800">
-              {site ? 'ENREGISTRER LES MODIFICATIONS' : 'ENREGISTRER'}
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
+            <Button onClick={handleSubmit} className="bg-slate-700 hover:bg-slate-800 w-full sm:w-auto text-xs sm:text-sm">
+              {site ? 'ENREGISTRER' : 'ENREGISTRER'}
             </Button>
           </div>
         </div>

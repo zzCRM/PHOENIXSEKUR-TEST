@@ -147,17 +147,33 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-3xl max-h-[100dvh] sm:max-h-[92vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="text-base">{client ? `Consultation d'un client — ${client.company_name}` : 'Nouveau client'}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          {/* Left sidebar tabs */}
-          <div className="w-44 shrink-0 border-r bg-muted/20 py-3 overflow-y-auto">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
+          {/* Tabs mobiles */}
+          <div className="md:hidden flex overflow-x-auto border-b bg-muted/20 shrink-0">
             {TABS.map(t => (
               <button
                 key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 ${tab === t.key ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground'}`}
+              >
+                <t.icon className="w-3.5 h-3.5" />
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Left sidebar tabs desktop */}
+          <div className="hidden md:block w-44 shrink-0 border-r bg-muted/20 py-3 overflow-y-auto">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                type="button"
                 onClick={() => setTab(t.key)}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${tab === t.key ? 'bg-primary/10 text-primary font-medium border-r-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
               >
@@ -173,12 +189,12 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 py-4 sm:py-5 min-w-0">
 
             {/* GÉNÉRAL */}
             {tab === 'general' && (
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Société *</Label>
                     <Input value={form.company_name} onChange={e => update('company_name', e.target.value)} required />
@@ -197,7 +213,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
                   <div className="space-y-1.5">
                     <Label>Logo client</Label>
                     <div className="flex items-center gap-3">
@@ -217,7 +233,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Statut</Label>
                     <Select value={form.status} onValueChange={v => update('status', v)}>
@@ -237,7 +253,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
 
                 <div className="border-t pt-4">
                   <h3 className="font-semibold mb-3 text-sm flex items-center gap-2"><FileText className="w-4 h-4 text-muted-foreground" /> Informations légales</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-1.5">
                       <Label>Forme juridique</Label>
                       <Select value={form.legal_form || ''} onValueChange={v => update('legal_form', v)}>
@@ -431,7 +447,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   <Label>Pays</Label>
                   <Input value={form.country || 'FRANCE'} onChange={e => update('country', e.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Code postal</Label>
                     <Input value={form.postal_code} onChange={e => update('postal_code', e.target.value)} />
@@ -470,7 +486,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
             {tab === 'facturation' && (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <h3 className="font-semibold text-sm flex items-center gap-2"><CreditCard className="w-4 h-4 text-muted-foreground" /> Facturation</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Délai de paiement (jours)</Label>
                     <Input type="number" value={form.payment_delay || ''} onChange={e => update('payment_delay', e.target.value)} placeholder="30" />

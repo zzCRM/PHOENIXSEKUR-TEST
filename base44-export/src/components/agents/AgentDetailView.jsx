@@ -364,7 +364,7 @@ export default function AgentDetailView({ agent, onClose }) {
 
               <div className="space-y-2">
                 {ACCES_OPTIONS.map(opt => (
-                  <div key={opt.key} className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/20">
+                  <div key={opt.key} className="flex items-start sm:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-muted/20">
                     <div>
                       <p className="text-sm font-medium">{opt.label}</p>
                       <p className="text-xs text-muted-foreground">{opt.description}</p>
@@ -493,29 +493,51 @@ export default function AgentDetailView({ agent, onClose }) {
 
   return (
     <Dialog open={!!agent} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-4xl max-h-[100dvh] sm:max-h-[92vh] p-0 overflow-hidden flex flex-col gap-0">
         {/* Header */}
-        <div className="bg-primary text-primary-foreground px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">Fiche collaborateur — {formData.last_name} {formData.first_name}</span>
+        <div className="bg-primary text-primary-foreground px-3 sm:px-6 py-3 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-sm truncate">
+              Fiche collaborateur — {formData.last_name} {formData.first_name}
+            </span>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="text-primary-foreground hover:bg-white/20 h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-primary-foreground hover:bg-white/20 h-8 w-8 shrink-0">
             <X className="w-4 h-4" />
           </Button>
         </div>
 
-        <div className="flex h-[calc(92vh-90px)]">
-          {/* Sidebar */}
-          <div className="w-56 shrink-0 border-r border-border bg-muted/20 overflow-y-auto">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Tabs mobiles — scroll horizontal */}
+          <div className="md:hidden flex overflow-x-auto border-b border-border bg-muted/30 shrink-0 scrollbar-none">
             {SECTIONS.map(s => (
               <button
                 key={s.id}
+                type="button"
+                onClick={() => setActiveSection(s.id)}
+                className={cn(
+                  'shrink-0 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
+                  activeSection === s.id
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground',
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sidebar desktop */}
+          <div className="hidden md:block w-56 shrink-0 border-r border-border bg-muted/20 overflow-y-auto">
+            {SECTIONS.map(s => (
+              <button
+                key={s.id}
+                type="button"
                 onClick={() => setActiveSection(s.id)}
                 className={cn(
                   'w-full text-left px-4 py-3 text-sm border-b border-border/50 transition-colors',
                   activeSection === s.id
                     ? 'bg-primary/10 text-primary font-semibold border-l-4 border-l-primary'
-                    : 'hover:bg-muted/50 text-foreground'
+                    : 'hover:bg-muted/50 text-foreground',
                 )}
               >
                 {s.label}
@@ -524,14 +546,14 @@ export default function AgentDetailView({ agent, onClose }) {
           </div>
 
           {/* Content */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-6">
               {renderSection()}
             </div>
-            <div className="border-t border-border p-4 flex gap-3 justify-end bg-background">
-              <Button variant="outline" onClick={onClose}>Annuler</Button>
-              <Button onClick={() => updateMut.mutate(formData)} disabled={updateMut.isPending}>
-                {updateMut.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            <div className="border-t border-border p-3 sm:p-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end bg-background shrink-0">
+              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
+              <Button onClick={() => updateMut.mutate(formData)} disabled={updateMut.isPending} className="w-full sm:w-auto">
+                {updateMut.isPending ? 'Enregistrement...' : 'Enregistrer'}
               </Button>
             </div>
           </div>
