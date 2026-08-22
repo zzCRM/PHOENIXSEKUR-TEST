@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { getHomePathForUser } from '@/lib/roleRoutes';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +56,7 @@ export default function AcceptInvitation() {
         first_name: firstName,
         last_name: lastName,
       });
-      const returnUrl = result.user?.superadmin ? '/super-admin' : '/';
+      const returnUrl = getHomePathForUser(result.user);
       navigate(returnUrl, { replace: true });
       window.location.reload();
     } catch (err) {

@@ -5,7 +5,8 @@ import { signToken, requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
 import { isCompanyAccessAllowed } from '../lib/platform-settings.js';
 import { getValidInvitation, roleLabel } from '../lib/invitations.js';
-import { setAuthCookie, clearAuthCookie, getAppUrl } from '../lib/auth-cookie.js';
+import { getAppRedirectUrl } from '../lib/role-redirect.js';
+import { setAuthCookie, clearAuthCookie } from '../lib/auth-cookie.js';
 import {
   roleMatchesPortal, portalMismatchMessage, createPasswordReset, getValidPasswordReset,
 } from '../lib/password-reset.js';
@@ -46,10 +47,9 @@ router.post('/login', async (req, res) => {
     const token = signToken(user);
     const superadmin = isSuperAdmin({ email: user.email, role: user.role });
     setAuthCookie(res, token);
-    const appUrl = getAppUrl();
     res.json({
       access_token: token,
-      redirect: superadmin ? `${appUrl}/super-admin` : `${appUrl}/`,
+      redirect: getAppRedirectUrl(user),
       user: {
         id: user.id,
         email: user.email,
@@ -235,12 +235,11 @@ router.get('/session', async (req, res) => {
       }
     }
     const superadmin = isSuperAdmin({ email: user.email, role: user.role });
-    const appUrl = getAppUrl();
     const accessToken = signToken(user);
     res.json({
       authenticated: true,
       access_token: accessToken,
-      redirect: superadmin ? `${appUrl}/super-admin` : `${appUrl}/`,
+      redirect: getAppRedirectUrl(user),
       user: { email: user.email, superadmin, role: user.role },
     });
   } catch {

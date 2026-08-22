@@ -9,7 +9,9 @@ import fileRoutes from './routes/files.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
 import publicRoutes from './routes/public.js';
+import reportRoutes from './routes/reports.js';
 import { authMiddleware } from './middleware/auth.js';
+import { startReportScheduler } from './lib/report-scheduler.js';
 
 dotenv.config();
 
@@ -54,6 +56,7 @@ app.get('/api/config/google-maps-key', (_req, res) => {
   res.json({ apiKey: key, data: { apiKey: key } });
 });
 
+app.use('/api/reports', reportRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/entities', entityRoutes);
@@ -68,4 +71,5 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`Phoenix Sekur API running on http://localhost:${PORT}`);
+  startReportScheduler();
 });

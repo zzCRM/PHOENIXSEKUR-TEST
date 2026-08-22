@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import RoleHomeRedirect from '@/components/RoleHomeRedirect';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import AppLayout from '@/components/layout/AppLayout';
@@ -60,7 +61,9 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
+    <>
+      <RoleHomeRedirect />
+      <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/planning" element={<PlanningAvance />} />
@@ -95,6 +98,7 @@ const AuthenticatedApp = () => {
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </>
   );
 };
 

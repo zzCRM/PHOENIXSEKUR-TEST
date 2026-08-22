@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Clock, AlertTriangle, CheckCircle2, Download, MapPin, Navigation, BookOpen, Bell, Calendar, Lock } from 'lucide-react';
@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { useGeolocation } from '@/lib/useGeolocation';
+import { usePtiTimer } from '@/lib/usePtiTimer';
+import { toast } from 'sonner';
 import PriseDeServiceNFC from '@/components/agent/PriseDeServiceNFC';
 import RondeNFC from '@/components/agent/RondeNFC';
 
@@ -117,22 +119,124 @@ export default function EspaceAgent() {
   const futureMissions = missions.filter(m => m.date >= today).slice(0, 15);
   const currentService = services.find(s => s.date === today && s.status === 'en_service');
 
+  const { data: currentSite } = useQuery({
+    queryKey: ['site_geofence', currentService?.site_id],
+    queryFn: () => base44.entities.Site.get(currentService.site_id),
+    enabled: !!currentService?.site_id,
+  });
+
+  const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
+  const geofenceAlertRef = useRef(false);
+
+  const handleGeofenceViolation = useCallback(async ({ latitude, longitude }) => {
+    if (!currentService || geofenceAlertRef.current) return;
+    geofenceAlertRef.current = true;
+    const now = format(new Date(), 'HH:mm');
+    await alerteMut.mutateAsync({
+      company_id: companyId,
+      type: 'geofence',
+      agent_id: user?.id,
+      agent_name: agentName,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      message: `⚠️ ${agentName} hors zone autorisée sur ${currentService.site_name} (${now})`,
+      latitude,
+      longitude,
+      date: today,
+      time: now,
+      severity: 'urgent',
+    });
+    await mcCreateMut.mutateAsync({
+      company_id: companyId,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      agent_id: user?.id,
+      agent_name: agentName,
+      date: today,
+      time: now,
+      type: 'geofence',
+      content: `Sortie de périmètre détectée — rayon ${currentSite?.geofence_radius || 200} m`,
+      latitude,
+      longitude,
+      severity: 'urgent',
+    });
+    toast.error('Hors zone — alerte envoyée au centre');
+    qc.invalidateQueries({ queryKey: ['alertes'] });
+    setTimeout(() => { geofenceAlertRef.current = false; }, 120000);
+  }, [currentService, companyId, user, agentName, today, currentSite, alerteMut, mcCreateMut, qc]);
+
+  const { position, outsideZone } = useGeolocation({
+    active: !!currentService,
+    agentId: user?.id,
+    agentName,
+    serviceId: currentService?.id,
+    siteId: currentService?.site_id,
+    siteName: currentService?.site_name,
+    companyId,
+    siteLatitude: currentSite?.latitude,
+    siteLongitude: currentSite?.longitude,
+    geofenceRadius: currentSite?.geofence_radius ?? 200,
+    onGeofenceViolation: handleGeofenceViolation,
+  });
+
+  const triggerPtiAlerte = useCallback(async (reason) => {
+    if (!currentService) return;
+    const now = format(new Date(), 'HH:mm');
+    await mcCreateMut.mutateAsync({
+      company_id: companyId,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      agent_id: user?.id,
+      agent_name: agentName,
+      date: today,
+      time: now,
+      type: 'pti_alerte',
+      content: reason || `⚠️ ALERTE PTI déclenchée à ${now}`,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+      severity: 'urgent',
+    });
+    await alerteMut.mutateAsync({
+      company_id: companyId,
+      type: 'pti_alerte',
+      agent_id: user?.id,
+      agent_name: agentName,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      message: `⚠️ ALERTE PTI - ${agentName} sur ${currentService.site_name} à ${now}`,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+      date: today,
+      time: now,
+      severity: 'urgent',
+    });
+    qc.invalidateQueries({ queryKey: ['alertes'] });
+  }, [currentService, companyId, user, agentName, today, position, mcCreateMut, alerteMut, qc]);
+
+  const ptiMissedRef = useRef(false);
+  const { timeLabel, overdue, resetTimer, secondsLeft, intervalMinutes } = usePtiTimer({
+    active: !!currentService && droits.acces_pti,
+    serviceId: currentService?.id,
+    intervalMinutes: 15,
+    onWarning: () => toast.warning('PTI : confirmez votre présence dans 1 minute'),
+    onMissedDeadline: () => {
+      if (ptiMissedRef.current) return;
+      ptiMissedRef.current = true;
+      triggerPtiAlerte('⚠️ ALERTE PTI automatique — absence de confirmation');
+      toast.error('PTI : alerte automatique déclenchée');
+    },
+  });
+
   // Main courante filtrée sur les sites de l'agent
   const agentSiteIds = [...new Set(missions.map(m => m.site_id).filter(Boolean))];
   const mcFiltered = mainCouranteData.filter(mc => agentSiteIds.includes(mc.site_id));
 
   // Rondes filtrées sur les sites de l'agent
   const rondesFiltrees = rondes.filter(r => agentSiteIds.includes(r.site_id));
-
-  const { position } = useGeolocation({
-    active: !!currentService,
-    agentId: user?.id,
-    agentName: user ? `${user.first_name || ''} ${user.last_name || user.full_name || ''}`.trim() : '',
-    serviceId: currentService?.id,
-    siteId: currentService?.site_id,
-    siteName: currentService?.site_name,
-    companyId,
-  });
 
   const newConsignes = consignes.filter(c => {
     const lastSeen = lastSeenConsignes[c.id];
@@ -151,7 +255,6 @@ export default function EspaceAgent() {
   const handleFinService = async () => {
     if (!currentService) return;
     const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
     await serviceUpdateMut.mutateAsync({
       id: currentService.id,
       data: { actual_end: now, status: 'termine', end_latitude: position?.latitude, end_longitude: position?.longitude }
@@ -175,7 +278,8 @@ export default function EspaceAgent() {
   const handlePtiCheck = async () => {
     if (!currentService) return;
     const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
+    ptiMissedRef.current = false;
+    resetTimer();
     await mcCreateMut.mutateAsync({
       company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
       client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
@@ -183,31 +287,16 @@ export default function EspaceAgent() {
       content: `PTI - Confirmation de présence à ${now}`,
       latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
     });
+    toast.success('Présence confirmée');
   };
 
   const handlePtiAlerte = async () => {
-    if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
-    await mcCreateMut.mutateAsync({
-      company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
-      client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
-      date: today, time: now, type: 'pti_alerte',
-      content: `⚠️ ALERTE PTI déclenchée à ${now} - Vérification immédiate requise`,
-      latitude: position?.latitude, longitude: position?.longitude, severity: 'urgent',
-    });
-    await alerteMut.mutateAsync({
-      company_id: companyId, type: 'pti_alerte', agent_id: user?.id, agent_name: agentName,
-      site_id: currentService.site_id, site_name: currentService.site_name, client_name: currentService.client_name,
-      message: `⚠️ ALERTE PTI - ${agentName} sur ${currentService.site_name} à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, date: today, time: now, severity: 'urgent',
-    });
-    qc.invalidateQueries({ queryKey: ['alertes'] });
+    await triggerPtiAlerte(`⚠️ ALERTE PTI manuelle à ${format(new Date(), 'HH:mm')}`);
+    toast.error('Alerte PTI envoyée');
   };
 
   const startRonde = async (ronde) => {
     const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
     await alerteMut.mutateAsync({
       company_id: companyId, type: 'debut_ronde', agent_id: user?.id, agent_name: agentName,
       site_id: ronde.site_id, site_name: ronde.site_name,
@@ -219,7 +308,6 @@ export default function EspaceAgent() {
     setShowRondeDialog(true);
   };
 
-  const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
   const agentDocs = docs.filter(d => d.target_type === 'tous' || (d.target_type === 'agent' && d.target_id === user?.id));
 
   return (
@@ -238,6 +326,11 @@ export default function EspaceAgent() {
           {currentService && position && (
             <Badge className="gap-1 bg-green-500 text-white animate-pulse">
               <Navigation className="w-3 h-3" /> GPS actif
+            </Badge>
+          )}
+          {outsideZone && (
+            <Badge className="gap-1 bg-red-600 text-white">
+              <MapPin className="w-3 h-3" /> Hors zone
             </Badge>
           )}
         </div>
@@ -388,21 +481,31 @@ export default function EspaceAgent() {
         {/* ===== PTI ===== */}
         <TabsContent value="pti">
           {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
-            <Card className={`p-8 text-center border-2 ${!currentService ? 'border-border opacity-70' : 'border-border'}`}>
-              <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <Card className={`p-8 text-center border-2 ${overdue ? 'border-red-500 bg-red-50' : 'border-border'}`}>
+              <Shield className={`w-16 h-16 mx-auto mb-4 ${overdue ? 'text-red-600' : 'text-muted-foreground'}`} />
               <h2 className="text-xl font-bold mb-2">Protection Travailleur Isolé</h2>
-              <p className="text-muted-foreground mb-6 text-sm">En cas de non-réponse, une alerte urgente est déclenchée immédiatement</p>
+              <p className="text-muted-foreground mb-4 text-sm">
+                Confirmez votre présence toutes les {intervalMinutes} minutes
+              </p>
               {!currentService ? (
                 <p className="text-amber-600 font-medium p-3 bg-amber-50 rounded-xl">Prenez votre service pour activer le PTI</p>
               ) : (
-                <div className="flex gap-4 justify-center">
-                  <Button size="lg" className="gap-2 bg-green-600 hover:bg-green-700 min-w-36" onClick={handlePtiCheck}>
-                    <CheckCircle2 className="w-5 h-5" /> Je suis OK
-                  </Button>
-                  <Button size="lg" variant="destructive" className="gap-2 min-w-36" onClick={handlePtiAlerte}>
-                    <AlertTriangle className="w-5 h-5" /> ALERTE PTI
-                  </Button>
-                </div>
+                <>
+                  <div className={`text-5xl font-mono font-bold mb-2 ${overdue ? 'text-red-600 animate-pulse' : secondsLeft <= 60 ? 'text-amber-600' : 'text-primary'}`}>
+                    {timeLabel}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-6">
+                    {overdue ? 'Délai dépassé — alerte envoyée' : 'Temps restant avant confirmation obligatoire'}
+                  </p>
+                  <div className="flex gap-4 justify-center flex-wrap">
+                    <Button size="lg" className="gap-2 bg-green-600 hover:bg-green-700 min-w-36" onClick={handlePtiCheck}>
+                      <CheckCircle2 className="w-5 h-5" /> Je suis OK
+                    </Button>
+                    <Button size="lg" variant="destructive" className="gap-2 min-w-36" onClick={handlePtiAlerte}>
+                      <AlertTriangle className="w-5 h-5" /> ALERTE PTI
+                    </Button>
+                  </div>
+                </>
               )}
             </Card>
           )}

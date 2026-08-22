@@ -118,6 +118,15 @@ ENTITY_NAMES.forEach((name) => {
 export const phoenix = {
   entities,
 
+  reports: {
+    async sendEmail(payload) {
+      return apiFetch('/reports/send-email', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+
   auth: {
     async me() {
       return apiFetch('/auth/me');
