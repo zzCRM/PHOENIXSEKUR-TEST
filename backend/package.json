@@ -14,6 +14,7 @@
     "seed:phase3": "node scripts/seed-phase3.js",
     "seed:phase4": "node scripts/seed-phase4.js",
     "fix:company-ids": "node scripts/fix-company-ids.js",
+    "create:user": "node scripts/create-user.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
