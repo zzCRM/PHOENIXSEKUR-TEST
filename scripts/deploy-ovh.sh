@@ -27,7 +27,7 @@ echo ""
 echo "⏳ Attente démarrage (40s)..."
 sleep 40
 
-if docker compose -f docker-compose.prod.yml exec -T backend wget -qO- http://localhost:3001/health 2>/dev/null | grep -q ok; then
+if docker compose -f docker-compose.prod.yml --env-file .env.production exec -T backend wget -qO- http://localhost:3001/health 2>/dev/null | grep -q ok; then
   echo "✅ Backend OK"
 else
   echo "⚠️  Vérifiez les logs: docker compose -f docker-compose.prod.yml logs -f backend"
