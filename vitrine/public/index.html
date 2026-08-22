@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phoenix Sekur — Logiciel de gardiennage & sécurité privée</title>
+  <meta name="description" content="Phoenix Sekur : planning, main courante, rondes NFC, facturation et espace client pour sociétés de sécurité." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="/config.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <a href="/" class="logo">
+        <span class="logo-icon">🔥</span>
+        <span>Phoenix <strong>Sekur</strong></span>
+      </a>
+      <nav class="nav">
+        <a href="#fonctionnalites">Fonctionnalités</a>
+        <a href="#essai">Essai gratuit</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <div class="header-actions">
+        <a id="btn-login" href="#" class="btn btn-ghost">Se connecter</a>
+        <a id="btn-app" href="#" class="btn btn-primary">Mon espace</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <span class="badge">Solution SaaS pour la sécurité privée</span>
+        <h1>Pilotez votre activité de <span class="text-accent">gardiennage</span> en un seul endroit</h1>
+        <p class="hero-lead">
+          Planning, main courante, rondes NFC, facturation, espace agent et espace client —
+          la plateforme tout-en-un pensée pour les sociétés de sécurité.
+        </p>
+        <div class="hero-cta">
+          <a href="#essai" class="btn btn-primary btn-lg">Demander un essai gratuit</a>
+          <a id="hero-app-link" href="#" class="btn btn-outline btn-lg">Accéder à l'application</a>
+        </div>
+        <p class="hero-note">✓ Essai 14 jours · ✓ Sans engagement · ✓ Hébergé en France</p>
+      </div>
+      <div class="hero-visual">
+        <div class="mockup">
+          <div class="mockup-bar"><span></span><span></span><span></span></div>
+          <div class="mockup-body">
+            <div class="mockup-sidebar"></div>
+            <div class="mockup-main">
+              <div class="mockup-card"></div>
+              <div class="mockup-card short"></div>
+              <div class="mockup-card"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="fonctionnalites" class="features">
+    <div class="container">
+      <h2 class="section-title">Tout ce dont votre société a besoin</h2>
+      <div class="features-grid">
+        <article class="feature-card">
+          <div class="feature-icon">📅</div>
+          <h3>Planning & missions</h3>
+          <p>Planification avancée, affectation agents, suivi des heures et écarts horaires.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">📋</div>
+          <h3>Main courante</h3>
+          <p>Journal de bord numérique, événements, rapports PDF automatiques pour vos clients.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <h3>Rondes NFC</h3>
+          <p>Points de contrôle, exécution des rondes, traçabilité complète sur site.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">💶</div>
+          <h3>Facturation</h3>
+          <p>Devis, factures, export PDF, suivi clients et contrats.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">👮</div>
+          <h3>Espace agent</h3>
+          <p>Missions, PTI, fiches de paie, demandes de congés depuis mobile.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-icon">🏢</div>
+          <h3>Espace client</h3>
+          <p>Portail client : planning, documents, main courante et rapports en temps réel.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="essai" class="signup-section">
+    <div class="container signup-grid">
+      <div>
+        <h2 class="section-title">Demandez votre essai gratuit</h2>
+        <p class="section-sub">
+          Remplissez le formulaire — notre équipe active votre espace sous 24–48 h.
+          Vous recevrez un email pour créer votre compte administrateur.
+        </p>
+        <ul class="check-list">
+          <li>14 jours d'essai offerts</li>
+          <li>Accompagnement à la prise en main</li>
+          <li>Import de vos données existantes</li>
+          <li>Support réactif</li>
+        </ul>
+      </div>
+      <form id="signup-form" class="signup-form">
+        <div id="form-success" class="form-message success hidden"></div>
+        <div id="form-error" class="form-message error hidden"></div>
+        <div class="form-row">
+          <label>Nom de la société *</label>
+          <input type="text" name="company_name" required placeholder="Phoenix Security SAS" />
+        </div>
+        <div class="form-row two-cols">
+          <div>
+            <label>Prénom</label>
+            <input type="text" name="first_name" placeholder="Jean" />
+          </div>
+          <div>
+            <label>Nom</label>
+            <input type="text" name="last_name" placeholder="Dupont" />
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Email professionnel *</label>
+          <input type="email" name="email" required placeholder="contact@votresociete.fr" />
+        </div>
+        <div class="form-row">
+          <label>Téléphone</label>
+          <input type="tel" name="phone" placeholder="06 12 34 56 78" />
+        </div>
+        <div class="form-row">
+          <label>Message (optionnel)</label>
+          <textarea name="message" rows="3" placeholder="Nombre d'agents, besoins spécifiques…"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg btn-full" id="submit-btn">
+          Envoyer ma demande
+        </button>
+        <p class="form-legal">En soumettant ce formulaire, vous acceptez d'être contacté par Phoenix Sekur.</p>
+      </form>
+    </div>
+  </section>
+
+  <section id="contact" class="cta-band">
+    <div class="container cta-inner">
+      <div>
+        <h2>Déjà client ?</h2>
+        <p>Connectez-vous à votre espace applicatif.</p>
+      </div>
+      <a id="cta-app-link" href="#" class="btn btn-white btn-lg">Ouvrir l'application →</a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <p>© 2026 Phoenix Sekur — Phoenix Personal Security France</p>
+      <p><a id="footer-app-link" href="#">app.phoenixsekur.com</a></p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js"></script>
+</body>
+</html>

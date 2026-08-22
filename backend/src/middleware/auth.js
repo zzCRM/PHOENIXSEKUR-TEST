@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { getTokenFromRequest } from '../lib/auth-cookie.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
@@ -16,8 +17,7 @@ export function signToken(user) {
 }
 
 export function authMiddleware(req, res, next) {
-  const header = req.headers.authorization;
-  const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
+  const token = getTokenFromRequest(req);
 
   if (!token) {
     req.user = null;

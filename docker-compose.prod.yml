@@ -33,6 +33,9 @@ services:
       ADMIN_COMPANY_ID: ${ADMIN_COMPANY_ID:-69edb44339460eb505c2a699}
       DOMAIN: ${DOMAIN}
       APP_URL: https://${DOMAIN}
+      VITRINE_DOMAIN: ${VITRINE_DOMAIN:-www.phoenixsekur.com}
+      VITRINE_URL: ${VITRINE_URL:-https://www.phoenixsekur.com}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.phoenixsekur.com}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
@@ -50,6 +53,11 @@ services:
     container_name: phoenixsekur-web
     restart: unless-stopped
 
+  vitrine:
+    build: ./vitrine
+    container_name: phoenixsekur-vitrine
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     container_name: phoenixsekur-caddy
@@ -57,11 +65,14 @@ services:
     depends_on:
       - backend
       - frontend
+      - vitrine
     ports:
       - "80:80"
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN}
+      VITRINE_DOMAIN: ${VITRINE_DOMAIN:-www.phoenixsekur.com}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-phoenixsekur.com}
       ACME_EMAIL: ${ACME_EMAIL}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

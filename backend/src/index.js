@@ -17,7 +17,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173', credentials: true }));
+function getCorsOrigins() {
+  const list = [
+    process.env.CORS_ORIGIN,
+    process.env.VITRINE_URL,
+    process.env.VITRINE_DOMAIN ? `https://${process.env.VITRINE_DOMAIN}` : null,
+    process.env.ROOT_DOMAIN ? `https://${process.env.ROOT_DOMAIN}` : null,
+  ].filter(Boolean);
+  return [...new Set(list)];
+}
+
+const corsOrigins = getCorsOrigins();
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || corsOrigins.length === 0 || corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(authMiddleware);
 

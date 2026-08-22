@@ -2,6 +2,17 @@
   email ${ACME_EMAIL}
 }
 
+# ─── Site vitrine (www.phoenixsekur.com) ───────────────────────────────────
+${VITRINE_DOMAIN}, ${ROOT_DOMAIN} {
+  encode gzip
+
+  @apex host ${ROOT_DOMAIN}
+  redir @apex https://${VITRINE_DOMAIN}{uri} permanent
+
+  reverse_proxy vitrine:80
+}
+
+# ─── Application SaaS (app.phoenixsekur.com) ────────────────────────────────
 ${DOMAIN} {
   encode gzip
 

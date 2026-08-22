@@ -146,8 +146,9 @@ export const phoenix = {
     },
 
     logout(redirectUrl) {
+      fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
       clearToken();
-      if (redirectUrl) window.location.href = '/login';
+      if (redirectUrl) window.location.href = redirectUrl;
     },
 
     redirectToLogin(returnUrl) {

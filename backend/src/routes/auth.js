@@ -5,6 +5,7 @@ import { signToken, requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
 import { isCompanyAccessAllowed } from '../lib/platform-settings.js';
 import { getValidInvitation, roleLabel } from '../lib/invitations.js';
+import { setAuthCookie, clearAuthCookie, getAppUrl } from '../lib/auth-cookie.js';
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.post('/login', async (req, res) => {
 
     const token = signToken(user);
     const superadmin = isSuperAdmin({ email: user.email, role: user.role });
+    setAuthCookie(res, token);
     res.json({
       access_token: token,
       user: {
@@ -134,6 +136,7 @@ router.post('/accept-invitation', async (req, res) => {
 
     const accessToken = signToken(user);
     const superadmin = isSuperAdmin({ email: user.email, role: user.role });
+    setAuthCookie(res, accessToken);
 
     res.status(201).json({
       access_token: accessToken,
@@ -151,6 +154,39 @@ router.post('/accept-invitation', async (req, res) => {
     console.error('Accept invitation error:', err);
     res.status(500).json({ error: 'Création du compte impossible' });
   }
+});
+
+router.get('/session', async (req, res) => {
+  if (!req.user) {
+    return res.json({ authenticated: false });
+  }
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!user || !user.isActive) {
+      clearAuthCookie(res);
+      return res.json({ authenticated: false });
+    }
+    if (!isSuperAdmin({ email: user.email, role: user.role })) {
+      const companyOk = await isCompanyAccessAllowed(user.companyId);
+      if (!companyOk) {
+        return res.json({ authenticated: false, reason: 'suspended' });
+      }
+    }
+    const superadmin = isSuperAdmin({ email: user.email, role: user.role });
+    const appUrl = getAppUrl();
+    res.json({
+      authenticated: true,
+      redirect: superadmin ? `${appUrl}/super-admin` : `${appUrl}/`,
+      user: { email: user.email, superadmin },
+    });
+  } catch {
+    res.json({ authenticated: false });
+  }
+});
+
+router.post('/logout', (_req, res) => {
+  clearAuthCookie(res);
+  res.json({ success: true });
 });
 
 router.post('/register', async (req, res) => {
