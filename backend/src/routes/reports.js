@@ -28,20 +28,18 @@ router.post('/send-email', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Destinataire email requis' });
     }
 
-    const text = body || buildReportSummaryText({
-      companyName,
-      start,
-      end,
-      modules,
-      stats: stats || {},
-    });
-
     const results = [];
     for (const email of recipients) {
       const result = await sendReportEmail({
         to: email,
-        subject: subject || `Rapport de sécurité — ${start} au ${end}`,
-        text,
+        companyName,
+        start,
+        end,
+        modules,
+        stats: stats || {},
+        // Sujet/corps custom optionnels ; sinon modèle Super Admin « report_client »
+        subject: subject || undefined,
+        text: body || undefined,
         pdfBase64,
         filename,
       });

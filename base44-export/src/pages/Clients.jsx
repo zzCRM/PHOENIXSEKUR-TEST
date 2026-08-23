@@ -36,13 +36,52 @@ export default function Clients() {
   });
 
   const createMut = useMutation({
-    mutationFn: (data) => base44.entities.Client.create({ ...data, company_id: companyId }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients', companyId] }); setShowForm(false); toast.success('Client créé avec succès'); },
+    mutationFn: async (data) => {
+      const { creer_compte_phoenix, ...clientData } = data;
+      const created = await base44.entities.Client.create({ ...clientData, company_id: companyId });
+      const emails = new Set();
+      if (creer_compte_phoenix && clientData.email) emails.add(String(clientData.email).trim().toLowerCase());
+      for (const c of clientData.comptes_clients || []) {
+        if (c.has_account && c.email) emails.add(String(c.email).trim().toLowerCase());
+      }
+      const invites = [];
+      for (const email of emails) {
+        invites.push(await base44.users.inviteUser(email, 'client'));
+      }
+      return { created, invites };
+    },
+    onSuccess: ({ invites }) => {
+      qc.invalidateQueries({ queryKey: ['clients', companyId] });
+      setShowForm(false);
+      const sent = (invites || []).filter((i) => i.email_sent).length;
+      if (sent > 0) toast.success(`Client créé — ${sent} invitation(s) envoyée(s)`);
+      else if ((invites || []).length > 0) toast.warning('Client créé — invitation(s) créée(s), email non envoyé');
+      else toast.success('Client créé avec succès');
+    },
     onError: (e) => toast.error('Erreur : ' + e.message),
   });
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Client.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients', companyId] }); setEditClient(null); toast.success('Client modifié'); },
+    mutationFn: async ({ id, data }) => {
+      const { creer_compte_phoenix, ...clientData } = data;
+      const updated = await base44.entities.Client.update(id, clientData);
+      const emails = new Set();
+      if (creer_compte_phoenix && clientData.email) emails.add(String(clientData.email).trim().toLowerCase());
+      for (const c of clientData.comptes_clients || []) {
+        if (c.has_account && c.email && !c.invite_sent) emails.add(String(c.email).trim().toLowerCase());
+      }
+      const invites = [];
+      for (const email of emails) {
+        invites.push(await base44.users.inviteUser(email, 'client'));
+      }
+      return { updated, invites };
+    },
+    onSuccess: ({ invites }) => {
+      qc.invalidateQueries({ queryKey: ['clients', companyId] });
+      setEditClient(null);
+      const sent = (invites || []).filter((i) => i.email_sent).length;
+      if (sent > 0) toast.success(`Client modifié — ${sent} invitation(s) envoyée(s)`);
+      else toast.success('Client modifié');
+    },
     onError: (e) => toast.error('Erreur : ' + e.message),
   });
   const deleteMut = useMutation({

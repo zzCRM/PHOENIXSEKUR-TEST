@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
-import { isEmailConfigured, getAppUrl } from './email.js';
+import { getAppUrl } from './email.js';
+import { getPlatformSettings, getEmailTemplate, renderTemplate } from './platform-settings.js';
 
 let transporter;
 
@@ -21,7 +22,10 @@ function getTransporter() {
   return transporter;
 }
 
-export async function sendReportEmail({ to, subject, text, html, pdfBase64, filename }) {
+export async function sendReportEmail({
+  to, subject, text, html, pdfBase64, filename,
+  companyName, start, end, modules, stats,
+}) {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
   const mailer = getTransporter();
 
@@ -29,6 +33,27 @@ export async function sendReportEmail({ to, subject, text, html, pdfBase64, file
     console.log(`[email] Rapport (SMTP off) → ${to}: ${subject}`);
     return { sent: false, reason: 'smtp_not_configured' };
   }
+
+  const settings = await getPlatformSettings();
+  const tpl = getEmailTemplate(settings, 'report_client');
+  const statsSummary = [
+    `Rondes : ${stats?.rondes ?? 0}`,
+    `Main courante : ${stats?.main_courante ?? 0}`,
+    `Incidents : ${stats?.incidents ?? 0}`,
+    `Missions : ${stats?.planning ?? 0}`,
+  ].join('\n');
+  const vars = {
+    company_name: companyName || 'Phoenix Sekur',
+    period_start: start || '',
+    period_end: end || '',
+    modules: (modules || []).join(', '),
+    stats_summary: statsSummary,
+    app_url: getAppUrl(),
+  };
+
+  const finalSubject = subject || renderTemplate(tpl.subject, vars);
+  const finalText = text || renderTemplate(tpl.body_text, vars);
+  const finalHtml = html || renderTemplate(tpl.body_html, vars);
 
   const attachments = pdfBase64 ? [{
     filename: filename || 'rapport-securite.pdf',
@@ -39,9 +64,9 @@ export async function sendReportEmail({ to, subject, text, html, pdfBase64, file
   await mailer.sendMail({
     from,
     to,
-    subject,
-    text,
-    html: html || text.replace(/\n/g, '<br>'),
+    subject: finalSubject,
+    text: finalText,
+    html: finalHtml || String(finalText || '').replace(/\n/g, '<br>'),
     attachments,
   });
 

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, CheckCircle2, Mail, Info, Shield, Plus, Trash2, Users, Building2, MapPin, CreditCard, FileText, User } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { CheckCircle2, Info, Shield, Plus, Trash2, Users, Building2, MapPin, CreditCard, FileText, User } from 'lucide-react';
 import { toast } from 'sonner';
 import ClientPortalPermissions, { DEFAULT_PORTAL_PERMS } from '@/components/clients/ClientPortalPermissions';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
@@ -53,13 +54,11 @@ const PORTAL_NOTIFS = [
 export default function ClientForm({ open, onClose, onSubmit, client }) {
   const { companyId } = useCompany();
   const [tab, setTab] = useState('general');
-  const [inviteSent, setInviteSent] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [compteClients, setCompteClients] = useState([{ email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+  const [compteClients, setCompteClients] = useState([{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
   const [portalPerms, setPortalPerms] = useState({ ...DEFAULT_PORTAL_PERMS });
   const [portalDroits, setPortalDroits] = useState({});
   const [portalNotifs, setPortalNotifs] = useState({});
+  const [creerComptePrincipal, setCreerComptePrincipal] = useState(false);
 
   const { data: sites = [] } = useQuery({
     queryKey: ['sites', companyId],
@@ -81,20 +80,21 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
   useEffect(() => {
     if (client) {
       setForm({ country: 'FRANCE', ...client });
-      setInviteEmail(client.email || '');
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS, ...(client.portal_perms || {}) });
-      setCompteClients(client.comptes_clients?.length ? client.comptes_clients : [{ email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+      setCompteClients(client.comptes_clients?.length
+        ? client.comptes_clients
+        : [{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits(client.portal_droits || {});
       setPortalNotifs(client.portal_notifs || {});
+      setCreerComptePrincipal(false);
     } else {
       setForm({ company_name: '', contact_name: '', email: '', phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
-      setInviteEmail('');
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS });
-      setCompteClients([{ email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+      setCompteClients([{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits({});
       setPortalNotifs({});
+      setCreerComptePrincipal(false);
     }
-    setInviteSent(false);
     setTab('general');
   }, [client, open]);
 
@@ -113,37 +113,30 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
 
   const handleSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    onSubmit({ ...form, portal_perms: portalPerms, comptes_clients: compteClients, portal_droits: portalDroits, portal_notifs: portalNotifs });
+    const needsAccount = creerComptePrincipal || compteClients.some((c) => c.has_account);
+    if (needsAccount) {
+      const emails = [
+        ...(creerComptePrincipal && form.email ? [form.email] : []),
+        ...compteClients.filter((c) => c.has_account && c.email).map((c) => c.email),
+      ];
+      if (emails.length === 0) {
+        toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
+        return;
+      }
+    }
+    onSubmit({
+      ...form,
+      portal_perms: portalPerms,
+      comptes_clients: compteClients,
+      portal_droits: portalDroits,
+      portal_notifs: portalNotifs,
+      creer_compte_phoenix: creerComptePrincipal,
+    });
   };
 
-  const addCompte = () => setCompteClients(prev => [...prev, { email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+  const addCompte = () => setCompteClients(prev => [...prev, { email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
   const removeCompte = (i) => setCompteClients(prev => prev.filter((_, idx) => idx !== i));
   const updateCompte = (i, field, val) => setCompteClients(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
-  const inviteCompte = async (i) => {
-    const compte = compteClients[i];
-    if (!compte.email) { toast.error('Email requis'); return; }
-    try {
-      await base44.users.inviteUser(compte.email, 'client');
-      updateCompte(i, 'invite_sent', true);
-      toast.success(`Invitation envoyée à ${compte.email}`);
-    } catch (err) {
-      toast.error("Erreur : " + (err.message || 'Erreur inconnue'));
-    }
-  };
-
-  const handleInvite = async () => {
-    const email = inviteEmail || form.email;
-    if (!email) { toast.error('Veuillez saisir un email'); return; }
-    setInviting(true);
-    try {
-      await base44.users.inviteUser(email, 'client');
-      setInviteSent(true);
-      toast.success(`Invitation envoyée à ${email}`);
-    } catch (err) {
-      toast.error("Erreur : " + (err.message || 'Erreur inconnue'));
-    }
-    setInviting(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -351,12 +344,21 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                         </div>
                         <span className="font-semibold text-sm">Compte</span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={compte.has_account || false}
-                          onCheckedChange={v => updateCompte(i, 'has_account', v)}
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id={`creer-compte-client-${i}`}
+                          checked={!!compte.has_account}
+                          onCheckedChange={v => updateCompte(i, 'has_account', !!v)}
+                          className="mt-0.5"
                         />
-                        <Label className="text-sm">Compte client</Label>
+                        <div>
+                          <Label htmlFor={`creer-compte-client-${i}`} className="text-sm font-medium cursor-pointer">
+                            Créer un compte Phoenix Sekur
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Invitation automatique par email à l&apos;enregistrement (au nom de votre société).
+                          </p>
+                        </div>
                       </div>
                       {compte.has_account && (
                         <div className="space-y-3">
@@ -364,7 +366,6 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                             <Label className="text-xs text-muted-foreground mb-1.5 block">Compte Phoenix Sekur®</Label>
                             <div className="flex items-center gap-2 p-2 rounded-lg border bg-background text-sm text-muted-foreground">
                               <span>{compte.email || '—'}</span>
-                              {compte.email && <button className="ml-auto text-xs text-destructive">✕</button>}
                             </div>
                           </div>
                           <div>
@@ -415,16 +416,11 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                             </div>
                           </div>
 
-                          {/* Invitation */}
-                          {compte.invite_sent ? (
+                          {compte.invite_sent && (
                             <div className="flex items-center gap-2 text-green-600 text-xs">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Invitation envoyée à {compte.email}</span>
+                              <span>Invitation déjà envoyée à {compte.email}</span>
                             </div>
-                          ) : (
-                            <Button type="button" size="sm" variant="outline" className="gap-2 h-8" onClick={() => inviteCompte(i)} disabled={!compte.email}>
-                              <Mail className="w-3.5 h-3.5" /> Envoyer l'invitation
-                            </Button>
                           )}
                         </div>
                       )}
@@ -516,22 +512,24 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
               <div className="space-y-5">
                 <ClientPortalPermissions perms={portalPerms} onChange={setPortalPerms} sites={clientSites} />
                 <div className="border-t pt-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-primary" />
-                    <Label className="text-sm font-semibold">Envoyer l'invitation portail</Label>
-                  </div>
-                  <Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="contact@client.fr" />
-                  {inviteSent ? (
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <p className="text-sm font-medium">Invitation envoyée à {inviteEmail}</p>
+                  <div className="flex items-start gap-3 rounded-xl border border-border p-4 bg-muted/20">
+                    <Checkbox
+                      id="creer-compte-phoenix-client-principal"
+                      checked={creerComptePrincipal}
+                      onCheckedChange={(v) => setCreerComptePrincipal(!!v)}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="creer-compte-phoenix-client-principal" className="text-sm font-semibold cursor-pointer">
+                        Créer un compte Phoenix Sekur
+                      </Label>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Utilise l&apos;email principal de la fiche ({form.email || 'non renseigné'}) et envoie
+                        l&apos;invitation automatiquement à l&apos;enregistrement, au nom de votre société.
+                        Vous pouvez aussi cocher la case sur chaque contact.
+                      </p>
                     </div>
-                  ) : (
-                    <Button className="w-full gap-2" onClick={handleInvite} disabled={inviting || !inviteEmail}>
-                      <Mail className="w-4 h-4" />
-                      {inviting ? 'Envoi en cours...' : "Envoyer l'invitation"}
-                    </Button>
-                  )}
+                  </div>
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
                     <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>Le client recevra un lien pour créer son mot de passe et accéder aux modules autorisés.</span>

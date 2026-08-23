@@ -129,22 +129,14 @@ export async function runScheduledReports({ force = false, companyId = null } = 
               : 0,
           };
 
-          const text = [
-            `Bonjour,`,
-            '',
-            `Voici le rapport de sécurité automatique pour ${client.company_name || 'votre site'}.`,
-            '',
-            buildReportSummaryText({ companyName, start, end, modules, stats }),
-            '',
-            `Société : ${companyName}`,
-            `— Envoi automatique Phoenix Sekur`,
-          ].join('\n');
-
           for (const to of emails) {
             const result = await sendReportEmail({
               to,
-              subject: `[Auto] Rapport sécurité — ${client.company_name || 'Client'} (${start} → ${end})`,
-              text,
+              companyName: client.company_name || companyName,
+              start,
+              end,
+              modules,
+              stats,
             });
             if (result.sent) sentCount += 1;
           }
@@ -163,8 +155,11 @@ export async function runScheduledReports({ force = false, companyId = null } = 
           };
           await sendReportEmail({
             to: companyEmail,
-            subject: `[Auto] Rapport sécurité global (${start} → ${end})`,
-            text: buildReportSummaryText({ companyName, start, end, modules, stats }),
+            companyName,
+            start,
+            end,
+            modules,
+            stats,
           });
           sentCount += 1;
         }

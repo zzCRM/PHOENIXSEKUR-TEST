@@ -1,5 +1,10 @@
 import nodemailer from 'nodemailer';
-import { getPlatformSettings, renderTemplate } from './platform-settings.js';
+import {
+  getPlatformSettings,
+  renderTemplate,
+  getEmailTemplate,
+  invitationTemplateIdForRole,
+} from './platform-settings.js';
 
 let transporter;
 let transporterKey = '';
@@ -59,47 +64,32 @@ export function getAppUrl() {
 }
 
 function invitationVars({ inviteUrl, invitedByEmail, roleLabel, companyName }) {
+  const company = companyName || 'Phoenix Sekur';
   const invitedByLine = invitedByEmail
-    ? `${invitedByEmail} vous invite à rejoindre Phoenix Sekur en tant que ${roleLabel}.`
-    : `Vous êtes invité(e) à rejoindre Phoenix Sekur en tant que ${roleLabel}.`;
+    ? `${invitedByEmail} vous invite à rejoindre ${company} sur Phoenix Sekur en tant que ${roleLabel}.`
+    : `Vous êtes invité(e) à rejoindre ${company} sur Phoenix Sekur en tant que ${roleLabel}.`;
 
   return {
     invite_url: inviteUrl,
     role_label: roleLabel,
     invited_by: invitedByEmail || '',
     invited_by_line: invitedByLine,
-    company_name: companyName || 'Phoenix Sekur',
+    company_name: company,
   };
 }
 
-export async function sendInvitationEmail({ to, inviteUrl, invitedByEmail, roleLabel, companyName }) {
+export async function sendInvitationEmail({
+  to, inviteUrl, invitedByEmail, roleLabel, companyName, role,
+}) {
   const settings = await getPlatformSettings();
   const { from, user } = smtpConfig();
   const vars = invitationVars({ inviteUrl, invitedByEmail, roleLabel, companyName });
+  const templateId = invitationTemplateIdForRole(role);
+  const tpl = getEmailTemplate(settings, templateId);
 
-  const subjectTpl = settings.invitation_subject
-    || settings.invite_subject
-    || 'Invitation à rejoindre Phoenix Sekur';
-  const textTpl = settings.invitation_body_text
-    || settings.invite_body_text
-    || `Bonjour,\n\n{{invited_by_line}}\n\nCréez votre compte :\n{{invite_url}}\n\nCe lien expire dans 7 jours.`;
-  const htmlTpl = settings.invitation_body_html
-    || settings.invite_body_html
-    || `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#111">
-  <h2 style="color:#c0392b">Phoenix Sekur</h2>
-  <p>Bonjour,</p>
-  <p>{{invited_by_line}}</p>
-  <p style="margin:28px 0">
-    <a href="{{invite_url}}" style="background:#c0392b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block">
-      Créer mon compte
-    </a>
-  </p>
-  <p style="font-size:13px;color:#666">Ou copiez ce lien :<br><a href="{{invite_url}}">{{invite_url}}</a></p>
-</div>`;
-
-  const subject = renderTemplate(subjectTpl, vars);
-  const text = renderTemplate(textTpl, vars);
-  const html = renderTemplate(htmlTpl, vars);
+  const subject = renderTemplate(tpl.subject, vars);
+  const text = renderTemplate(tpl.body_text, vars);
+  const html = renderTemplate(tpl.body_html, vars);
 
   const transport = getTransporter();
   if (!transport) {
@@ -132,7 +122,7 @@ export async function sendInvitationEmail({ to, inviteUrl, invitedByEmail, roleL
 
 export async function sendSignupNotifyEmail({ signupRequest }) {
   const settings = await getPlatformSettings();
-  const notifyList = (settings.signup_notify_emails || settings.signup_notify_emails || '')
+  const notifyList = (settings.signup_notify_emails || '')
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean);
@@ -141,18 +131,18 @@ export async function sendSignupNotifyEmail({ signupRequest }) {
 
   const { from, user } = smtpConfig();
   const appUrl = getAppUrl();
-  const subject = `[Phoenix Sekur] Nouvelle demande d'inscription — ${signupRequest.companyName || signupRequest.email}`;
-  const text = [
-    'Nouvelle demande d\'inscription depuis le site vitrine :',
-    '',
-    `Société : ${signupRequest.companyName || '—'}`,
-    `Contact : ${`${signupRequest.firstName || ''} ${signupRequest.lastName || ''}`.trim()}`,
-    `Email : ${signupRequest.email}`,
-    `Téléphone : ${signupRequest.phone || '—'}`,
-    `Message : ${signupRequest.message || '—'}`,
-    '',
-    `Gérer dans Super Admin : ${appUrl}/super-admin`,
-  ].join('\n');
+  const vars = {
+    company_name: signupRequest.companyName || signupRequest.email || '—',
+    contact_name: `${signupRequest.firstName || ''} ${signupRequest.lastName || ''}`.trim() || '—',
+    email: signupRequest.email || '—',
+    phone: signupRequest.phone || '—',
+    message: signupRequest.message || '—',
+    admin_url: `${appUrl}/super-admin`,
+  };
+  const tpl = getEmailTemplate(settings, 'signup_notify');
+  const subject = renderTemplate(tpl.subject, vars);
+  const text = renderTemplate(tpl.body_text, vars);
+  const html = renderTemplate(tpl.body_html, vars);
 
   const transport = getTransporter();
   if (!transport) {
@@ -162,7 +152,7 @@ export async function sendSignupNotifyEmail({ signupRequest }) {
 
   try {
     for (const to of notifyList) {
-      await transport.sendMail({ from: from || user, to, subject, text });
+      await transport.sendMail({ from: from || user, to, subject, text, html });
     }
     return { sent: true };
   } catch (err) {
@@ -174,24 +164,13 @@ export async function sendSignupNotifyEmail({ signupRequest }) {
 }
 
 export async function sendPasswordResetEmail({ to, resetUrl }) {
+  const settings = await getPlatformSettings();
   const { from, user } = smtpConfig();
-  const subject = 'Réinitialisation de votre mot de passe — Phoenix Sekur';
-  const text = [
-    'Bonjour,',
-    '',
-    'Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe (valide 1 heure) :',
-    resetUrl,
-    '',
-    '— L\'équipe Phoenix Sekur',
-  ].join('\n');
-
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
-      <h2 style="color: #c0392b;">Phoenix Sekur</h2>
-      <p>Cliquez pour réinitialiser votre mot de passe :</p>
-      <p><a href="${resetUrl}" style="background:#c0392b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;">Nouveau mot de passe</a></p>
-    </div>
-  `;
+  const vars = { reset_url: resetUrl, company_name: 'Phoenix Sekur' };
+  const tpl = getEmailTemplate(settings, 'password_reset');
+  const subject = renderTemplate(tpl.subject, vars);
+  const text = renderTemplate(tpl.body_text, vars);
+  const html = renderTemplate(tpl.body_html, vars);
 
   const transport = getTransporter();
   if (!transport) {

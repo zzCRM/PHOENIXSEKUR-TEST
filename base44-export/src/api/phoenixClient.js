@@ -1,6 +1,5 @@
 const TOKEN_KEY = 'phoenix_access_token';
 const API_BASE = '/api';
-const VITRINE_URL = (import.meta.env.VITE_VITRINE_URL || 'https://www.phoenixsekur.com').replace(/\/$/, '');
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || localStorage.getItem('base44_access_token');

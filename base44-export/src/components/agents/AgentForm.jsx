@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { UserPlus, Shield, CheckCircle2, Mail, Info, Lock } from 'lucide-react';
+import { CheckCircle2, Info, Lock } from 'lucide-react';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 const ROLE_OPTIONS = [
@@ -43,9 +43,7 @@ const DEFAULT_DROITS = {
 
 export default function AgentForm({ open, onClose, onSubmit, agent }) {
   const [tab, setTab] = useState('infos');
-  const [inviteSent, setInviteSent] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [creerComptePhoenix, setCreerComptePhoenix] = useState(false);
   const [agentRole, setAgentRole] = useState('agent');
   const [droits, setDroits] = useState({ ...DEFAULT_DROITS });
 
@@ -58,16 +56,15 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
   useEffect(() => {
     if (agent) {
       setForm({ ...agent, hourly_rate: agent.hourly_rate || '' });
-      setInviteEmail(agent.email || '');
       setAgentRole(agent.role || 'agent');
       setDroits({ ...DEFAULT_DROITS, ...agent.droits_portail });
+      setCreerComptePhoenix(false);
     } else {
       setForm({ first_name: '', last_name: '', email: '', phone: '', card_number: '', card_expiry: '', status: 'actif', address: '', hire_date: '', hourly_rate: '', notes: '', role: 'agent' });
-      setInviteEmail('');
       setAgentRole('agent');
       setDroits({ ...DEFAULT_DROITS });
+      setCreerComptePhoenix(false);
     }
-    setInviteSent(false);
     setTab('infos');
   }, [agent, open]);
 
@@ -76,28 +73,17 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
 
   const handleSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    onSubmit({ ...form, hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : undefined, role: agentRole, droits_portail: droits });
-  };
-
-  const handleInvite = async () => {
-    const email = inviteEmail || form.email;
-    if (!email) { toast.error('Veuillez saisir un email'); return; }
-    setInviting(true);
-    try {
-      const result = await base44.users.inviteUser(email, 'user');
-      setInviteSent(true);
-      if (result.email_sent) {
-        toast.success(`Invitation envoyée par email à ${email}`);
-      } else if (result.invite_url) {
-        toast.warning('Email non envoyé — lien à copier');
-        try { await navigator.clipboard.writeText(result.invite_url); toast.message('Lien d\'invitation copié'); } catch { /* ignore */ }
-      } else {
-        toast.success(result.message || `Invitation créée pour ${email}`);
-      }
-    } catch (err) {
-      toast.error("Erreur lors de l'invitation : " + (err.message || 'Erreur inconnue'));
+    if (creerComptePhoenix && !form.email) {
+      toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
+      return;
     }
-    setInviting(false);
+    onSubmit({
+      ...form,
+      hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : undefined,
+      role: agentRole,
+      droits_portail: droits,
+      creer_compte_phoenix: creerComptePhoenix,
+    });
   };
 
   return (
@@ -244,31 +230,26 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
             </div>
 
             <div className="border-t pt-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-primary" />
-                <Label className="text-sm font-semibold">Créer un compte portail</Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Envoie un email d'invitation à l'agent pour qu'il accède à son espace personnel.
-              </p>
-              <div className="space-y-2">
-                <Label>Email d'invitation</Label>
-                <Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="email@agent.fr" />
-              </div>
-              {inviteSent ? (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <p className="text-sm font-medium">Invitation envoyée à {inviteEmail}</p>
+              <div className="flex items-start gap-3 rounded-xl border border-border p-4 bg-muted/20">
+                <Checkbox
+                  id="creer-compte-phoenix-agent"
+                  checked={creerComptePhoenix}
+                  onCheckedChange={(v) => setCreerComptePhoenix(!!v)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="creer-compte-phoenix-agent" className="text-sm font-semibold cursor-pointer">
+                    Créer un compte Phoenix Sekur
+                  </Label>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Si coché, une invitation est envoyée automatiquement à l&apos;email de la fiche
+                    (au nom de votre société) pour activer l&apos;espace salarié.
+                  </p>
                 </div>
-              ) : (
-                <Button className="w-full gap-2" onClick={handleInvite} disabled={inviting || !inviteEmail}>
-                  <Mail className="w-4 h-4" />
-                  {inviting ? 'Envoi en cours...' : 'Envoyer l\'invitation'}
-                </Button>
-              )}
+              </div>
               <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
                 <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>L&apos;invitation ouvre un compte <strong>collaborateur</strong> (espace salarié). Le rôle RH (agent / superviseur) reste interne à la fiche.</span>
+                <span>Un email valide est requis sur la fiche pour créer le compte.</span>
               </div>
             </div>
 

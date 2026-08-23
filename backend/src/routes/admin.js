@@ -9,6 +9,7 @@ import {
   getPlatformSettings,
   updatePlatformSettings,
   DEFAULT_SETTINGS,
+  EMAIL_TEMPLATE_DEFS,
 } from '../lib/platform-settings.js';
 
 const router = Router();
@@ -329,24 +330,25 @@ router.patch('/companies/:companyId/subscription', async (req, res) => {
 
 router.get('/settings', async (_req, res) => {
   const settings = await getPlatformSettings();
-  res.json(settings);
+  res.json({ ...settings, email_template_defs: EMAIL_TEMPLATE_DEFS });
 });
 
 router.patch('/settings', async (req, res) => {
   const allowed = [
     'default_trial_days', 'invitation_subject',
     'invitation_body_html', 'invitation_body_text', 'signup_notify_emails',
+    'email_templates',
   ];
   const partial = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) partial[key] = req.body[key];
   }
   const settings = await updatePlatformSettings(partial);
-  res.json(settings);
+  res.json({ ...settings, email_template_defs: EMAIL_TEMPLATE_DEFS });
 });
 
 router.get('/settings/defaults', (_req, res) => {
-  res.json(DEFAULT_SETTINGS);
+  res.json({ ...DEFAULT_SETTINGS, email_template_defs: EMAIL_TEMPLATE_DEFS });
 });
 
 router.get('/me', (req, res) => {

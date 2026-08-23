@@ -3,8 +3,9 @@ import { prisma } from './prisma.js';
 import { getAppUrl, sendInvitationEmail } from './email.js';
 
 const ROLE_LABELS = {
-  admin: 'Administrateur',
-  user: 'Agent / Collaborateur',
+  admin: 'Administrateur société',
+  user: 'Collaborateur',
+  agent: 'Collaborateur',
   client: 'Client',
   superadmin: 'Super Administrateur',
 };
@@ -69,6 +70,7 @@ export async function createAndSendInvitation({
     invitedByEmail: invitedBy,
     roleLabel: roleLabel(role),
     companyName,
+    role,
   });
 
   return {
@@ -96,11 +98,28 @@ export async function resendInvitation(invitationId, invitedBy) {
   });
 
   const inviteUrl = `${getAppUrl()}/invitation/${token}`;
+
+  let companyName = null;
+  if (updated.companyId) {
+    try {
+      const row = await prisma.companySettings.findFirst({
+        where: { companyId: updated.companyId },
+        select: { data: true },
+      });
+      const data = row?.data && typeof row.data === 'object' ? row.data : {};
+      companyName = data.company_name || data.companyName || null;
+    } catch (err) {
+      console.warn('[invite] Impossible de charger le nom de société (resend):', err.message);
+    }
+  }
+
   const emailResult = await sendInvitationEmail({
     to: updated.email,
     inviteUrl,
     invitedByEmail: updated.invitedBy,
     roleLabel: roleLabel(updated.role),
+    companyName,
+    role: updated.role,
   });
 
   return {

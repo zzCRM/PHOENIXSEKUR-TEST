@@ -61,11 +61,14 @@ export default function SuperAdmin() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('admin');
 
+  const [emailTemplateId, setEmailTemplateId] = useState('invitation_collaborateur');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailHtml, setEmailHtml] = useState('');
   const [emailText, setEmailText] = useState('');
   const [trialDays, setTrialDays] = useState('14');
   const [notifyEmails, setNotifyEmails] = useState('');
+  const [emailTemplates, setEmailTemplates] = useState({});
+  const [emailTemplateDefs, setEmailTemplateDefs] = useState([]);
 
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
@@ -101,15 +104,30 @@ export default function SuperAdmin() {
     queryKey: ['admin-settings'],
     queryFn: async () => {
       const s = await base44.admin.getSettings();
-      setEmailSubject(s.invitation_subject || '');
-      setEmailHtml(s.invitation_body_html || '');
-      setEmailText(s.invitation_body_text || '');
+      const templates = s.email_templates || {};
+      setEmailTemplates(templates);
+      setEmailTemplateDefs(s.email_template_defs || []);
       setTrialDays(String(s.default_trial_days ?? 14));
       setNotifyEmails(s.signup_notify_emails || '');
+      const firstId = 'invitation_collaborateur';
+      const tpl = templates[firstId] || {};
+      setEmailTemplateId(firstId);
+      setEmailSubject(tpl.subject || s.invitation_subject || '');
+      setEmailHtml(tpl.body_html || s.invitation_body_html || '');
+      setEmailText(tpl.body_text || s.invitation_body_text || '');
       return s;
     },
     enabled: isSuperAdmin,
   });
+
+  const loadTemplateIntoForm = (id, templatesMap) => {
+    const map = templatesMap || emailTemplates;
+    const tpl = map[id] || {};
+    setEmailTemplateId(id);
+    setEmailSubject(tpl.subject || '');
+    setEmailHtml(tpl.body_html || '');
+    setEmailText(tpl.body_text || '');
+  };
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ['admin-stats'] });
@@ -236,7 +254,7 @@ export default function SuperAdmin() {
             )}
           </TabsTrigger>
           <TabsTrigger value="companies">Sociétés</TabsTrigger>
-          <TabsTrigger value="email">Email invitation</TabsTrigger>
+          <TabsTrigger value="email">Emails</TabsTrigger>
         </TabsList>
 
         {/* ── Vue d'ensemble ── */}
@@ -565,24 +583,21 @@ export default function SuperAdmin() {
           </Card>
         </TabsContent>
 
-        {/* ── Email invitation ── */}
+        {/* ── Emails (modèles) ── */}
         <TabsContent value="email" className="space-y-4 mt-4">
           <Card className="p-6">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <Settings className="w-5 h-5" /> Personnaliser l'email d'invitation
+            <h2 className="font-semibold mb-1 flex items-center gap-2">
+              <Settings className="w-5 h-5" /> Modèles d&apos;emails
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Variables disponibles :{' '}
-              <code className="text-xs bg-muted px-1 rounded">{'{{invite_url}}'}</code>{' '}
-              <code className="text-xs bg-muted px-1 rounded">{'{{role_label}}'}</code>{' '}
-              <code className="text-xs bg-muted px-1 rounded">{'{{invited_by}}'}</code>{' '}
-              <code className="text-xs bg-muted px-1 rounded">{'{{invited_by_line}}'}</code>{' '}
-              <code className="text-xs bg-muted px-1 rounded">{'{{company_name}}'}</code>
+              Personnalisez le contenu selon le type de destinataire et l&apos;action
+              (invitation collaborateur / client / société, reset mdp, rapports…).
             </p>
+
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label>Jours d'essai par défaut (vitrine)</Label>
+                  <Label>Jours d&apos;essai par défaut (vitrine)</Label>
                   <Input
                     type="number" min={1} max={90}
                     value={trialDays}
@@ -598,8 +613,50 @@ export default function SuperAdmin() {
                   />
                 </div>
               </div>
+
               <div className="space-y-1">
-                <Label>Objet de l'email</Label>
+                <Label>Type d&apos;email</Label>
+                <Select
+                  value={emailTemplateId}
+                  onValueChange={(id) => loadTemplateIntoForm(id)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(emailTemplateDefs.length
+                      ? emailTemplateDefs
+                      : [
+                        { id: 'invitation_collaborateur', label: 'Invitation collaborateur' },
+                        { id: 'invitation_client', label: 'Invitation client' },
+                        { id: 'invitation_societe', label: 'Invitation société' },
+                        { id: 'password_reset', label: 'Reset mot de passe' },
+                        { id: 'signup_notify', label: 'Alerte inscription' },
+                        { id: 'report_client', label: 'Rapport client' },
+                      ]
+                    ).map((d) => (
+                      <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {emailTemplateDefs.find((d) => d.id === emailTemplateId)?.description && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {emailTemplateDefs.find((d) => d.id === emailTemplateId).description}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-xs text-muted-foreground mr-1 self-center">Variables :</span>
+                {(emailTemplateDefs.find((d) => d.id === emailTemplateId)?.vars || [
+                  'company_name', 'invite_url', 'role_label',
+                ]).map((v) => (
+                  <code key={v} className="text-[11px] bg-muted px-1.5 py-0.5 rounded">{`{{${v}}}`}</code>
+                ))}
+              </div>
+
+              <div className="space-y-1">
+                <Label>Objet</Label>
                 <Input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
               </div>
               <div className="space-y-1">
@@ -617,16 +674,31 @@ export default function SuperAdmin() {
                 />
               </div>
               <Button
-                onClick={() => settingsMut.mutate({
-                  invitation_subject: emailSubject,
-                  invitation_body_html: emailHtml,
-                  invitation_body_text: emailText,
-                  default_trial_days: Number(trialDays) || 14,
-                  signup_notify_emails: notifyEmails,
-                })}
+                onClick={() => {
+                  const nextTemplates = {
+                    ...emailTemplates,
+                    [emailTemplateId]: {
+                      subject: emailSubject,
+                      body_html: emailHtml,
+                      body_text: emailText,
+                    },
+                  };
+                  setEmailTemplates(nextTemplates);
+                  settingsMut.mutate({
+                    email_templates: nextTemplates,
+                    default_trial_days: Number(trialDays) || 14,
+                    signup_notify_emails: notifyEmails,
+                    // Compat anciens champs = modèle collaborateur
+                    ...(emailTemplateId === 'invitation_collaborateur' ? {
+                      invitation_subject: emailSubject,
+                      invitation_body_html: emailHtml,
+                      invitation_body_text: emailText,
+                    } : {}),
+                  });
+                }}
                 disabled={settingsMut.isPending}
               >
-                Enregistrer les paramètres
+                Enregistrer ce modèle
               </Button>
             </div>
           </Card>

@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X, User, Briefcase, MapPin, Image as ImageIcon, Shield,
-  Star, AlertTriangle, FileText, Package, Euro, Clock, CheckCircle2, Mail, Copy
+  Star, AlertTriangle, FileText, Package, Euro, Clock, CheckCircle2
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -54,23 +55,28 @@ export default function AgentDetailView({ agent, onClose }) {
   const [activeSection, setActiveSection] = useState('general');
   const [formData, setFormData] = useState({ ...agent });
   const [photoFile, setPhotoFile] = useState(null);
-  const [inviting, setInviting] = useState(false);
-  const [inviteSent, setInviteSent] = useState(false);
-  const [inviteEmailSent, setInviteEmailSent] = useState(false);
-  const [inviteLink, setInviteLink] = useState(null);
+  const [creerComptePhoenix, setCreerComptePhoenix] = useState(false);
   const qc = useQueryClient();
 
   const updateMut = useMutation({
     mutationFn: async (data) => {
+      const { creer_compte_phoenix, ...payload } = data;
       if (photoFile) {
         const { file_url } = await base44.integrations.Core.UploadFile({ file: photoFile });
-        data.photo_url = file_url;
+        payload.photo_url = file_url;
       }
-      return base44.entities.Agent.update(agent.id, data);
+      const updated = await base44.entities.Agent.update(agent.id, payload);
+      let invite = null;
+      if (creer_compte_phoenix && payload.email) {
+        invite = await base44.users.inviteUser(payload.email, 'user');
+      }
+      return { updated, invite };
     },
-    onSuccess: () => {
+    onSuccess: ({ invite }) => {
       qc.invalidateQueries({ queryKey: ['agents'] });
-      toast.success('Fiche enregistrée');
+      if (invite?.email_sent) toast.success('Fiche enregistrée — invitation envoyée');
+      else if (invite?.invite_url) toast.warning('Fiche enregistrée — invitation créée, email non envoyé');
+      else toast.success('Fiche enregistrée');
       onClose();
     },
     onError: (err) => toast.error('Erreur : ' + err.message),
@@ -85,28 +91,6 @@ export default function AgentDetailView({ agent, onClose }) {
     const reader = new FileReader();
     reader.onload = (ev) => update('photo_url', ev.target.result);
     reader.readAsDataURL(file);
-  };
-
-  const handleInvite = async () => {
-    const email = formData.email;
-    if (!email) { toast.error('Ajoutez un email d\'abord'); return; }
-    setInviting(true);
-    try {
-      const result = await base44.users.inviteUser(email, 'user');
-      setInviteSent(true);
-      setInviteEmailSent(!!result.email_sent);
-      setInviteLink(result.invite_url || null);
-      if (result.email_sent) {
-        toast.success(`Invitation envoyée par email à ${email}`);
-      } else if (result.invite_url) {
-        toast.warning('Email non envoyé — copiez le lien ci-dessous');
-      } else {
-        toast.success(result.message || `Invitation créée pour ${email}`);
-      }
-    } catch (err) {
-      toast.error('Erreur invitation : ' + err.message);
-    }
-    setInviting(false);
   };
 
   const renderSection = () => {
@@ -377,46 +361,22 @@ export default function AgentDetailView({ agent, onClose }) {
             </div>
 
             <div className="border-t pt-4 space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Invitation</h3>
-              <p className="text-xs text-muted-foreground">Envoie un email d'invitation à l'agent pour créer son mot de passe.</p>
-              <div className="p-3 rounded-xl bg-muted/30 text-sm">
-                Email : <strong>{formData.email || <span className="text-destructive">Non renseigné</span>}</strong>
-              </div>
-              {inviteSent ? (
-                <div className={`space-y-2 p-3 rounded-xl border ${inviteEmailSent ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
-                  <div className="flex items-center gap-2">
-                    {inviteEmailSent ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-                    <p className="text-sm font-medium">
-                      {inviteEmailSent ? 'Invitation envoyée par email' : 'Invitation créée — email non envoyé'}
-                    </p>
-                  </div>
-                  {inviteLink && (
-                    <div className="flex gap-2">
-                      <Input readOnly value={inviteLink} className="text-xs bg-white/80" />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(inviteLink);
-                            toast.success('Lien copié');
-                          } catch {
-                            toast.error('Impossible de copier');
-                          }
-                        }}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
+              <div className="flex items-start gap-3 rounded-xl border border-border p-4 bg-muted/20">
+                <Checkbox
+                  id="creer-compte-phoenix-detail"
+                  checked={creerComptePhoenix}
+                  onCheckedChange={(v) => setCreerComptePhoenix(!!v)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="creer-compte-phoenix-detail" className="text-sm font-semibold cursor-pointer">
+                    Créer un compte Phoenix Sekur
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    À l&apos;enregistrement, envoie une invitation à <strong>{formData.email || '— (email manquant)'}</strong> au nom de votre société.
+                  </p>
                 </div>
-              ) : (
-                <Button className="w-full gap-2" onClick={handleInvite} disabled={inviting || !formData.email}>
-                  <Mail className="w-4 h-4" />
-                  {inviting ? 'Envoi...' : 'Envoyer l\'invitation par email'}
-                </Button>
-              )}
+              </div>
             </div>
           </div>
         );
@@ -550,7 +510,17 @@ export default function AgentDetailView({ agent, onClose }) {
             </div>
             <div className="border-t border-border p-3 sm:p-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end bg-background shrink-0">
               <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
-              <Button onClick={() => updateMut.mutate(formData)} disabled={updateMut.isPending} className="w-full sm:w-auto">
+              <Button
+                onClick={() => {
+                  if (creerComptePhoenix && !formData.email) {
+                    toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
+                    return;
+                  }
+                  updateMut.mutate({ ...formData, creer_compte_phoenix: creerComptePhoenix });
+                }}
+                disabled={updateMut.isPending}
+                className="w-full sm:w-auto"
+              >
                 {updateMut.isPending ? 'Enregistrement...' : 'Enregistrer'}
               </Button>
             </div>
