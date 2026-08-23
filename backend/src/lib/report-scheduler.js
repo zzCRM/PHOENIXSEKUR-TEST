@@ -1,5 +1,5 @@
 import { getEntityDelegate, toApiRecord } from './prisma.js';
-import { sendReportEmail, buildReportSummaryText } from './report-email.js';
+import { sendReportEmail } from './report-email.js';
 
 function periodDates(freq) {
   const end = new Date();

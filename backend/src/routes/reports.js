@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { sendReportEmail, buildReportSummaryText } from '../lib/report-email.js';
+import { sendReportEmail } from '../lib/report-email.js';
 import { getEntityDelegate } from '../lib/prisma.js';
 import { runScheduledReports } from '../lib/report-scheduler.js';
 
