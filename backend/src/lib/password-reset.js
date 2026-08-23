@@ -9,8 +9,8 @@ export const PORTAL_ROLES = {
 };
 
 export const PORTAL_LABELS = {
-  entreprise: 'Entreprise',
-  collaborateur: 'Collaborateur',
+  entreprise: 'Société de sécurité',
+  collaborateur: 'Salarié',
   client: 'Client',
 };
 

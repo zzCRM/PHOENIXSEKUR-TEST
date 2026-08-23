@@ -13,29 +13,7 @@
   const activeTab = document.querySelector(`.portal-tab[data-portal="${defaultPortal}"]`);
   if (activeTab) activeTab.click();
 
-  function resolveRedirect(result) {
-    const roleHome = result.redirect;
-    const returnUrl = params.get('return');
-    if (returnUrl) {
-      try {
-        const u = new URL(returnUrl);
-        const appHost = new URL(PhoenixAuth.APP_URL).host;
-        if (u.host === appHost) {
-          const path = (u.pathname || '/').replace(/\/$/, '') || '/';
-          // Ne jamais forcer un portail salarié/client via ?return=
-          if (path === '/espace-agent' || path === '/espace-client' || path === '/login') {
-            return roleHome;
-          }
-          return returnUrl;
-        }
-      } catch { /* ignore invalid URL */ }
-    }
-    return roleHome;
-  }
-
-  PhoenixAuth.checkSession().then((s) => {
-    if (s.authenticated) PhoenixAuth.redirectToApp(resolveRedirect(s));
-  });
+  // Pas de connexion auto : l'utilisateur choisit toujours Société / Salarié / Client
 
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -50,7 +28,7 @@
       const password = document.getElementById('password').value;
       const portal = document.getElementById('portal').value;
       const result = await PhoenixAuth.login({ email, password, portal });
-      PhoenixAuth.redirectToApp(resolveRedirect(result));
+      PhoenixAuth.redirectToApp(result.redirect);
     } catch (err) {
       errEl.textContent = err.message || 'Identifiants incorrects';
       errEl.classList.remove('hidden');

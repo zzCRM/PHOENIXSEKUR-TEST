@@ -132,8 +132,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
-    // Retour sur / (pas /espace-agent) pour afficher le login et le bon portail après connexion
-    base44.auth.redirectToLogin(`${window.location.origin}/`);
+    base44.auth.redirectToLogin();
   };
 
   return (

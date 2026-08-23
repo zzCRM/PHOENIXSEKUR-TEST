@@ -135,10 +135,10 @@ export const phoenix = {
       return apiFetch('/auth/me');
     },
 
-    async loginViaEmailPassword(email, password) {
+    async loginViaEmailPassword(email, password, portal) {
       const result = await apiFetch('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, portal }),
       });
       if (result.access_token) setToken(result.access_token);
       const me = await apiFetch('/auth/me');
@@ -169,13 +169,12 @@ export const phoenix = {
         ? redirectUrl
         : redirectUrl === null
           ? undefined
-          : `${VITRINE_URL}/?logged_out=1`;
+          : `${typeof window !== 'undefined' ? window.location.origin : ''}/login`;
       if (dest) window.location.href = dest;
     },
 
-    redirectToLogin(returnUrl) {
-      const ret = returnUrl || window.location.href;
-      window.location.href = `${VITRINE_URL}/login.html?return=${encodeURIComponent(ret)}`;
+    redirectToLogin() {
+      window.location.href = `${window.location.origin}/login`;
     },
 
     setToken,

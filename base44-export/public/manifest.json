@@ -1,8 +1,8 @@
 {
   "name": "Phoenix Sekur",
   "short_name": "Phoenix Sekur",
-  "description": "Phoenix Sekur — sécurité, planning, rondes, portails",
-  "start_url": "/",
+  "description": "Phoenix Sekur — connexion société, salarié ou client",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
