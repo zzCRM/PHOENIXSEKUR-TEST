@@ -13,9 +13,8 @@ import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import { toast } from 'sonner';
 
 const ROLE_OPTIONS = [
-  { value: 'agent', label: 'Agent', description: 'Accès espace agent uniquement' },
-  { value: 'superviseur', label: 'Superviseur', description: 'Accès agent + supervision équipe' },
-  { value: 'admin', label: 'Administrateur', description: 'Accès complet à l\'application' },
+  { value: 'agent', label: 'Agent', description: 'Accès espace collaborateur' },
+  { value: 'superviseur', label: 'Superviseur', description: 'Accès collaborateur + supervision équipe' },
 ];
 
 const DROITS_AGENT = [
@@ -85,8 +84,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
     if (!email) { toast.error('Veuillez saisir un email'); return; }
     setInviting(true);
     try {
-      const appRole = (agentRole === 'admin' || agentRole === 'superviseur') ? 'admin' : 'user';
-      const result = await base44.users.inviteUser(email, appRole);
+      const result = await base44.users.inviteUser(email, 'user');
       setInviteSent(true);
       if (result.email_sent) {
         toast.success(`Invitation envoyée par email à ${email}`);
@@ -270,7 +268,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
               )}
               <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
                 <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>Niveau d'accès : <strong>{agentRole === 'admin' ? 'Administrateur' : agentRole === 'superviseur' ? 'Admin (superviseur)' : 'Utilisateur standard'}</strong>.</span>
+                <span>L&apos;invitation ouvre un compte <strong>collaborateur</strong> (espace salarié). Le rôle RH (agent / superviseur) reste interne à la fiche.</span>
               </div>
             </div>
 

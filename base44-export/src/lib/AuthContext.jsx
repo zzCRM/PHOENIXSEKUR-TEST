@@ -132,11 +132,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
-    if (isOwnApi) {
-      base44.auth.redirectToLogin(window.location.href);
-    } else {
-      base44.auth.redirectToLogin(window.location.href);
-    }
+    // Retour sur / (pas /espace-agent) pour afficher le login et le bon portail après connexion
+    base44.auth.redirectToLogin(`${window.location.origin}/`);
   };
 
   return (

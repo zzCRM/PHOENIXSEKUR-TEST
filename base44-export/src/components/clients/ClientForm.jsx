@@ -56,7 +56,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
   const [inviteSent, setInviteSent] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [compteClients, setCompteClients] = useState([{ email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+  const [compteClients, setCompteClients] = useState([{ email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
   const [portalPerms, setPortalPerms] = useState({ ...DEFAULT_PORTAL_PERMS });
   const [portalDroits, setPortalDroits] = useState({});
   const [portalNotifs, setPortalNotifs] = useState({});
@@ -83,14 +83,14 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
       setForm({ country: 'FRANCE', ...client });
       setInviteEmail(client.email || '');
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS, ...(client.portal_perms || {}) });
-      setCompteClients(client.comptes_clients?.length ? client.comptes_clients : [{ email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+      setCompteClients(client.comptes_clients?.length ? client.comptes_clients : [{ email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits(client.portal_droits || {});
       setPortalNotifs(client.portal_notifs || {});
     } else {
       setForm({ company_name: '', contact_name: '', email: '', phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
       setInviteEmail('');
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS });
-      setCompteClients([{ email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+      setCompteClients([{ email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits({});
       setPortalNotifs({});
     }
@@ -116,14 +116,14 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
     onSubmit({ ...form, portal_perms: portalPerms, comptes_clients: compteClients, portal_droits: portalDroits, portal_notifs: portalNotifs });
   };
 
-  const addCompte = () => setCompteClients(prev => [...prev, { email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+  const addCompte = () => setCompteClients(prev => [...prev, { email: '', role: 'client', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
   const removeCompte = (i) => setCompteClients(prev => prev.filter((_, idx) => idx !== i));
   const updateCompte = (i, field, val) => setCompteClients(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
   const inviteCompte = async (i) => {
     const compte = compteClients[i];
     if (!compte.email) { toast.error('Email requis'); return; }
     try {
-      await base44.users.inviteUser(compte.email, compte.role || 'user');
+      await base44.users.inviteUser(compte.email, 'client');
       updateCompte(i, 'invite_sent', true);
       toast.success(`Invitation envoyée à ${compte.email}`);
     } catch (err) {
@@ -136,7 +136,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
     if (!email) { toast.error('Veuillez saisir un email'); return; }
     setInviting(true);
     try {
-      await base44.users.inviteUser(email, 'user');
+      await base44.users.inviteUser(email, 'client');
       setInviteSent(true);
       toast.success(`Invitation envoyée à ${email}`);
     } catch (err) {

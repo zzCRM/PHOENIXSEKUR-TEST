@@ -16,14 +16,14 @@ import { toast } from 'sonner';
 
 const ROLE_CONFIG = {
   admin: {
-    label: 'Administrateur',
-    desc: 'Accès complet à toutes les fonctionnalités',
+    label: 'Administrateur société',
+    desc: 'Compte société (création via onboarding / plateforme)',
     icon: Shield,
     color: 'text-red-600 bg-red-50',
   },
   user: {
-    label: 'Agent / Collaborateur',
-    desc: 'Accès espace agent : missions, rondes, PTI',
+    label: 'Collaborateur',
+    desc: 'Accès espace collaborateur : missions, rondes, PTI',
     icon: User,
     color: 'text-blue-600 bg-blue-50',
   },
@@ -45,8 +45,7 @@ function statusBadge(status) {
 
 export default function InviterUtilisateurs() {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('user');
-  const [inviteType, setInviteType] = useState('agent');
+  const [inviteType, setInviteType] = useState('collaborateur');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
   const [inviteLink, setInviteLink] = useState(null);
@@ -74,7 +73,7 @@ export default function InviterUtilisateurs() {
     ];
     return merged
       .filter((row) => {
-        if (filter === 'collaborateurs') return row.role === 'user' || row.role === 'admin';
+        if (filter === 'collaborateurs') return row.role === 'user' || row.role === 'agent';
         if (filter === 'clients') return row.role === 'client';
         if (filter === 'pending') return row.type === 'invitation';
         return true;
@@ -92,7 +91,7 @@ export default function InviterUtilisateurs() {
       .sort((a, b) => String(a.sortKey).localeCompare(String(b.sortKey)));
   }, [users, invitations, filter, search]);
 
-  const roleKey = inviteType === 'client' ? 'client' : role;
+  const roleKey = inviteType === 'client' ? 'client' : 'user';
   const roleInfo = ROLE_CONFIG[roleKey] || ROLE_CONFIG.user;
   const RoleIcon = roleInfo.icon;
 
@@ -147,7 +146,7 @@ export default function InviterUtilisateurs() {
     setInviteLink(null);
     setEmailSent(null);
     try {
-      const inviteRole = inviteType === 'client' ? 'client' : (role === 'admin' ? 'admin' : 'user');
+      const inviteRole = inviteType === 'client' ? 'client' : 'user';
       const result = await base44.users.inviteUser(email, inviteRole);
 
       if (inviteType === 'client' && companyId && !result.already_registered) {
@@ -227,16 +226,16 @@ export default function InviterUtilisateurs() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => { setInviteType('agent'); setRole('user'); }}
-              className={`p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${inviteType === 'agent' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
+              onClick={() => setInviteType('collaborateur')}
+              className={`p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${inviteType === 'collaborateur' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
             >
-              <User className={`w-5 h-5 sm:w-6 sm:h-6 mb-2 ${inviteType === 'agent' ? 'text-primary' : 'text-muted-foreground'}`} />
-              <p className="font-semibold text-sm">Agent / Salarié</p>
-              <p className="text-xs text-muted-foreground hidden sm:block">Accès espace agent</p>
+              <User className={`w-5 h-5 sm:w-6 sm:h-6 mb-2 ${inviteType === 'collaborateur' ? 'text-primary' : 'text-muted-foreground'}`} />
+              <p className="font-semibold text-sm">Collaborateur</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">Accès espace salarié</p>
             </button>
             <button
               type="button"
-              onClick={() => { setInviteType('client'); setRole('client'); }}
+              onClick={() => setInviteType('client')}
               className={`p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${inviteType === 'client' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}
             >
               <Building2 className={`w-5 h-5 sm:w-6 sm:h-6 mb-2 ${inviteType === 'client' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -255,21 +254,6 @@ export default function InviterUtilisateurs() {
               autoComplete="email"
             />
           </div>
-
-          {inviteType === 'agent' && (
-            <div className="space-y-2">
-              <Label>Rôle</Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Agent / Collaborateur</SelectItem>
-                  <SelectItem value="admin">Administrateur</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className={`p-3 rounded-lg ${roleInfo.color}`}>
             <div className="flex items-start gap-2">

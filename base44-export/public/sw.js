@@ -1,8 +1,8 @@
 /* Service worker minimal — cache shell pour usage terrain */
-const CACHE = 'phoenix-sekur-v3';
+const CACHE = 'phoenix-sekur-v4';
 const ASSETS = [
   '/',
-  '/espace-agent',
+  '/login',
   '/manifest.json',
   '/phoenix-sekur-logo.png',
   '/apple-touch-icon.png',

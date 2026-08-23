@@ -1,8 +1,9 @@
 {
   "name": "Phoenix Sekur",
   "short_name": "Phoenix Sekur",
-  "description": "Application agents — planning, rondes, PTI, main courante",
-  "start_url": "/espace-agent",
+  "description": "Phoenix Sekur — sécurité, planning, rondes, portails",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#c0392b",

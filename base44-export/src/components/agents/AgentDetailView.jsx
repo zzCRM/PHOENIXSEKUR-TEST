@@ -92,8 +92,7 @@ export default function AgentDetailView({ agent, onClose }) {
     if (!email) { toast.error('Ajoutez un email d\'abord'); return; }
     setInviting(true);
     try {
-      const appRole = (formData.role === 'admin' || formData.role === 'superviseur') ? 'admin' : 'user';
-      const result = await base44.users.inviteUser(email, appRole);
+      const result = await base44.users.inviteUser(email, 'user');
       setInviteSent(true);
       setInviteEmailSent(!!result.email_sent);
       setInviteLink(result.invite_url || null);
@@ -300,7 +299,6 @@ export default function AgentDetailView({ agent, onClose }) {
                     <SelectContent>
                       <SelectItem value="agent">Agent</SelectItem>
                       <SelectItem value="superviseur">Superviseur</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

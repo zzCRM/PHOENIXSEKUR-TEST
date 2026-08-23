@@ -115,6 +115,14 @@ router.post('/invite', requireAuth, requireCompanyAdmin, async (req, res) => {
 
     const companyId = req.body.company_id || req.user.companyId;
     const appRole = resolveInviteRole(role);
+
+    // Une société de sécurité invite uniquement collaborateurs ou clients (pas d'admin)
+    if (!superadmin && appRole === 'admin') {
+      return res.status(400).json({
+        error: 'Impossible d\'inviter un administrateur. Choisissez collaborateur ou client.',
+      });
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });

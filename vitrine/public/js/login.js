@@ -14,15 +14,23 @@
   if (activeTab) activeTab.click();
 
   function resolveRedirect(result) {
+    const roleHome = result.redirect;
     const returnUrl = params.get('return');
     if (returnUrl) {
       try {
         const u = new URL(returnUrl);
         const appHost = new URL(PhoenixAuth.APP_URL).host;
-        if (u.host === appHost) return returnUrl;
+        if (u.host === appHost) {
+          const path = (u.pathname || '/').replace(/\/$/, '') || '/';
+          // Ne jamais forcer un portail salarié/client via ?return=
+          if (path === '/espace-agent' || path === '/espace-client' || path === '/login') {
+            return roleHome;
+          }
+          return returnUrl;
+        }
       } catch { /* ignore invalid URL */ }
     }
-    return result.redirect;
+    return roleHome;
   }
 
   PhoenixAuth.checkSession().then((s) => {
