@@ -173,19 +173,16 @@ export async function runScheduledReports({ force = false, companyId = null } = 
       for (const to of extra) {
         await sendReportEmail({
           to,
-          subject: `[Auto] Rapport sécurité (${start} → ${end})`,
-          text: buildReportSummaryText({
-            companyName,
-            start,
-            end,
-            modules,
-            stats: {
-              rondes: await countForClient('RondeExecution', companyId, null, start, end),
-              main_courante: await countForClient('MainCourante', companyId, null, start, end),
-              incidents: await countForClient('Alerte', companyId, null, start, end),
-              planning: await countForClient('Mission', companyId, null, start, end),
-            },
-          }),
+          companyName,
+          start,
+          end,
+          modules,
+          stats: {
+            rondes: await countForClient('RondeExecution', companyId, null, start, end),
+            main_courante: await countForClient('MainCourante', companyId, null, start, end),
+            incidents: await countForClient('Alerte', companyId, null, start, end),
+            planning: await countForClient('Mission', companyId, null, start, end),
+          },
         });
         sentCount += 1;
       }
