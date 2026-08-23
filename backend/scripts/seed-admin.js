@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 const ADMIN = {
   email: process.env.ADMIN_EMAIL || 'admin@phoenixsekur.fr',
   password: process.env.ADMIN_PASSWORD || 'Phoenix2026!',
-  companyId: process.env.ADMIN_COMPANY_ID || '69edb44339460eb505c2a699',
+  companyId: process.env.PLATFORM_COMPANY_ID || '__platform__',
   firstName: 'Admin',
   lastName: 'Phoenix',
   role: process.env.ADMIN_ROLE || 'superadmin',
@@ -23,7 +23,15 @@ const ADMIN = {
 async function main() {
   const existing = await prisma.user.findUnique({ where: { email: ADMIN.email } });
   if (existing) {
-    console.log(`ℹ️  Admin déjà existant: ${ADMIN.email}`);
+    if (existing.companyId !== ADMIN.companyId || existing.role !== ADMIN.role) {
+      await prisma.user.update({
+        where: { email: ADMIN.email },
+        data: { companyId: ADMIN.companyId, role: ADMIN.role },
+      });
+      console.log(`ℹ️  Admin mis à jour (isolation plateforme): ${ADMIN.email}`);
+    } else {
+      console.log(`ℹ️  Admin déjà existant: ${ADMIN.email}`);
+    }
     return;
   }
 

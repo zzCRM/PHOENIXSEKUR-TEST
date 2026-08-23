@@ -4,6 +4,11 @@ import { requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
 import { createAndSendInvitation, resendInvitation, roleLabel } from '../lib/invitations.js';
 import { getSmtpStatus, isEmailConfigured } from '../lib/email.js';
+import {
+  getPlatformEmails,
+  isPlatformCompanyId,
+  isPlatformUser,
+} from '../lib/tenant.js';
 
 const router = Router();
 
@@ -21,29 +26,49 @@ function requireCompanyAdmin(req, res, next) {
   return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
 }
 
-function companyScope(req) {
-  if (isSuperAdmin(req.user) && (req.query.company_id || req.body?.company_id)) {
-    return req.query.company_id || req.body.company_id;
+/** Société cible : un admin société ne peut jamais cibler une autre société. */
+function resolveCompanyIdForAdmin(req, { allowBody = false } = {}) {
+  if (isSuperAdmin(req.user)) {
+    const fromReq = allowBody
+      ? (req.body?.company_id || req.query?.company_id)
+      : (req.query?.company_id || req.body?.company_id);
+    return fromReq || null;
   }
-  return req.user.companyId;
+  return req.user.companyId || null;
 }
 
 router.get('/smtp-status', requireAuth, requireCompanyAdmin, (_req, res) => {
   res.json(getSmtpStatus());
 });
 
-// Liste comptes + invitations (portail entreprise)
+// Liste comptes + invitations (portail entreprise) — strictement la société connectée
 router.get('/', requireAuth, requireCompanyAdmin, async (req, res) => {
   try {
-    const companyId = companyScope(req);
-    if (!companyId && !isSuperAdmin(req.user)) {
+    const companyId = resolveCompanyIdForAdmin(req);
+    if (!companyId || isPlatformCompanyId(companyId)) {
+      if (isSuperAdmin(req.user) && !companyId) {
+        return res.status(400).json({
+          error: 'Indiquez company_id pour lister une société (Super Admin)',
+        });
+      }
       return res.status(403).json({ error: 'Société requise' });
     }
 
-    const whereUser = companyId ? { companyId } : {};
+    const platformEmails = getPlatformEmails();
+    const whereUser = {
+      companyId,
+      role: { not: 'superadmin' },
+      ...(platformEmails.length
+        ? { email: { notIn: platformEmails } }
+        : {}),
+    };
     const whereInvite = {
       acceptedAt: null,
-      ...(companyId ? { companyId } : {}),
+      companyId,
+      role: { not: 'superadmin' },
+      ...(platformEmails.length
+        ? { email: { notIn: platformEmails } }
+        : {}),
     };
 
     const [users, invitations] = await Promise.all([
@@ -109,11 +134,22 @@ router.post('/invite', requireAuth, requireCompanyAdmin, async (req, res) => {
     if (!email) return res.status(400).json({ error: 'Email requis' });
 
     const superadmin = isSuperAdmin(req.user);
-    if (!superadmin && !req.user.companyId) {
+    const companyId = resolveCompanyIdForAdmin(req, { allowBody: true });
+
+    if (!superadmin && !companyId) {
       return res.status(403).json({ error: 'Société requise' });
     }
+    if (!superadmin && req.body.company_id && req.body.company_id !== req.user.companyId) {
+      return res.status(403).json({ error: 'Impossible d\'inviter hors de votre société' });
+    }
+    if (!companyId || isPlatformCompanyId(companyId)) {
+      return res.status(400).json({
+        error: superadmin
+          ? 'Indiquez company_id (société cliente) pour inviter'
+          : 'Société requise',
+      });
+    }
 
-    const companyId = req.body.company_id || req.user.companyId;
     const appRole = resolveInviteRole(role);
 
     // Une société de sécurité invite uniquement collaborateurs ou clients (pas d'admin)
@@ -124,6 +160,9 @@ router.post('/invite', requireAuth, requireCompanyAdmin, async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    if (getPlatformEmails().includes(normalizedEmail)) {
+      return res.status(400).json({ error: 'Cet email est réservé à la plateforme' });
+    }
 
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
@@ -218,6 +257,9 @@ router.patch('/:id', requireAuth, requireCompanyAdmin, async (req, res) => {
     if (!isSuperAdmin(req.user) && user.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
+    if (isPlatformUser(user) && !isSuperAdmin(req.user)) {
+      return res.status(403).json({ error: 'Compte plateforme — non modifiable' });
+    }
 
     const data = {};
     if (typeof req.body.is_active === 'boolean') data.isActive = req.body.is_active;
@@ -247,8 +289,8 @@ router.delete('/:id', requireAuth, requireCompanyAdmin, async (req, res) => {
     if (!isSuperAdmin(req.user) && user.companyId !== req.user.companyId) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
-    if (user.role === 'superadmin' && !isSuperAdmin(req.user)) {
-      return res.status(403).json({ error: 'Impossible de supprimer un super admin' });
+    if (isPlatformUser(user) && !isSuperAdmin(req.user)) {
+      return res.status(403).json({ error: 'Impossible de supprimer un compte plateforme' });
     }
 
     await prisma.user.delete({ where: { id: user.id } });

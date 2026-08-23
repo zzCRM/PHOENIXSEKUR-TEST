@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { CheckCircle2, Info, Lock } from 'lucide-react';
+import { CheckCircle2, Info, Lock, Shield } from 'lucide-react';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
@@ -120,7 +120,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => { update('email', e.target.value); setInviteEmail(e.target.value); }} />
+                  <Input type="email" value={form.email} onChange={e => update('email', e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Téléphone</Label>

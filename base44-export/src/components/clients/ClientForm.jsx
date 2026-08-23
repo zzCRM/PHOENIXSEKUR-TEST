@@ -202,7 +202,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Email</Label>
-                    <Input type="email" value={form.email} onChange={e => { update('email', e.target.value); setInviteEmail(e.target.value); }} />
+                    <Input type="email" value={form.email} onChange={e => update('email', e.target.value)} />
                   </div>
                   </div>
 

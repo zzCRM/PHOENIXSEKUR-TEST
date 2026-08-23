@@ -64,7 +64,13 @@ router.post('/users', async (req, res) => {
   const { email, password, role = 'admin', company_id, first_name, last_name } = req.body;
   if (!email) return res.status(400).json({ error: 'Email requis' });
 
-  const companyId = company_id || process.env.ADMIN_COMPANY_ID || '69edb44339460eb505c2a699';
+  const companyId = company_id
+    || (role === 'superadmin' ? (process.env.PLATFORM_COMPANY_ID || '__platform__') : null);
+  if (!companyId) {
+    return res.status(400).json({
+      error: 'company_id requis pour créer un compte société (isolation multi-tenant)',
+    });
+  }
   const normalizedEmail = email.trim().toLowerCase();
 
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
