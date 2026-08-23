@@ -37,10 +37,10 @@ export default function Clients() {
 
   const createMut = useMutation({
     mutationFn: async (data) => {
-      const { creer_compte_phoenix, ...clientData } = data;
+      const clientData = { ...data };
+      delete clientData.creer_compte_phoenix;
       const created = await base44.entities.Client.create({ ...clientData, company_id: companyId });
       const emails = new Set();
-      if (creer_compte_phoenix && clientData.email) emails.add(String(clientData.email).trim().toLowerCase());
       for (const c of clientData.comptes_clients || []) {
         if (c.has_account && c.email) emails.add(String(c.email).trim().toLowerCase());
       }
@@ -62,10 +62,10 @@ export default function Clients() {
   });
   const updateMut = useMutation({
     mutationFn: async ({ id, data }) => {
-      const { creer_compte_phoenix, ...clientData } = data;
+      const clientData = { ...data };
+      delete clientData.creer_compte_phoenix;
       const updated = await base44.entities.Client.update(id, clientData);
       const emails = new Set();
-      if (creer_compte_phoenix && clientData.email) emails.add(String(clientData.email).trim().toLowerCase());
       for (const c of clientData.comptes_clients || []) {
         if (c.has_account && c.email && !c.invite_sent) emails.add(String(c.email).trim().toLowerCase());
       }

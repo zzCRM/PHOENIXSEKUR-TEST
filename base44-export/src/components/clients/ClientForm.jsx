@@ -58,7 +58,6 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
   const [portalPerms, setPortalPerms] = useState({ ...DEFAULT_PORTAL_PERMS });
   const [portalDroits, setPortalDroits] = useState({});
   const [portalNotifs, setPortalNotifs] = useState({});
-  const [creerComptePrincipal, setCreerComptePrincipal] = useState(false);
 
   const { data: sites = [] } = useQuery({
     queryKey: ['sites', companyId],
@@ -86,14 +85,12 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
         : [{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits(client.portal_droits || {});
       setPortalNotifs(client.portal_notifs || {});
-      setCreerComptePrincipal(false);
     } else {
       setForm({ company_name: '', contact_name: '', email: '', phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS });
       setCompteClients([{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits({});
       setPortalNotifs({});
-      setCreerComptePrincipal(false);
     }
     setTab('general');
   }, [client, open]);
@@ -113,12 +110,9 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
 
   const handleSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    const needsAccount = creerComptePrincipal || compteClients.some((c) => c.has_account);
+    const needsAccount = compteClients.some((c) => c.has_account);
     if (needsAccount) {
-      const emails = [
-        ...(creerComptePrincipal && form.email ? [form.email] : []),
-        ...compteClients.filter((c) => c.has_account && c.email).map((c) => c.email),
-      ];
+      const emails = compteClients.filter((c) => c.has_account && c.email).map((c) => c.email);
       if (emails.length === 0) {
         toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
         return;
@@ -130,7 +124,6 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
       comptes_clients: compteClients,
       portal_droits: portalDroits,
       portal_notifs: portalNotifs,
-      creer_compte_phoenix: creerComptePrincipal,
     });
   };
 
@@ -511,29 +504,12 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
             {tab === 'acces' && (
               <div className="space-y-5">
                 <ClientPortalPermissions perms={portalPerms} onChange={setPortalPerms} sites={clientSites} />
-                <div className="border-t pt-4 space-y-3">
-                  <div className="flex items-start gap-3 rounded-xl border border-border p-4 bg-muted/20">
-                    <Checkbox
-                      id="creer-compte-phoenix-client-principal"
-                      checked={creerComptePrincipal}
-                      onCheckedChange={(v) => setCreerComptePrincipal(!!v)}
-                      className="mt-0.5"
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor="creer-compte-phoenix-client-principal" className="text-sm font-semibold cursor-pointer">
-                        Créer un compte Phoenix Sekur
-                      </Label>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Utilise l&apos;email principal de la fiche ({form.email || 'non renseigné'}) et envoie
-                        l&apos;invitation automatiquement à l&apos;enregistrement, au nom de votre société.
-                        Vous pouvez aussi cocher la case sur chaque contact.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
-                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>Le client recevra un lien pour créer son mot de passe et accéder aux modules autorisés.</span>
-                  </div>
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground border-t pt-4">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Pour créer un compte Phoenix Sekur, cochez la case sur un contact dans l&apos;onglet Contacts.
+                    Le client recevra alors une invitation pour accéder aux modules autorisés ici.
+                  </span>
                 </div>
                 <div className="flex justify-end gap-3 pt-2 border-t">
                   <Button variant="outline" onClick={onClose}>Fermer</Button>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import { useCompany } from '@/lib/useCompany';
 import {
   Pencil, Info, X, Maximize2, Palette, Plus, ChevronDown, Crosshair,
   MapPin, Camera, Upload, Trash2, Building2, Info as InfoIcon, Lock,
@@ -65,6 +66,7 @@ function ComingSoon({ icon: Icon, title, description }) {
 }
 
 export default function SiteFormModal({ open, onClose, onSubmit, site, clients = [] }) {
+  const { companyId } = useCompany();
   const [activeTab, setActiveTab] = useState('general');
   const normalize = (s) => ({
     name: '', client_id: '', client_name: '', type: 'gardiennage', status: 'actif',
@@ -72,7 +74,9 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
     latitude: null, longitude: null, photo_url: '', instructions: '', nfc_tag_id: '', geofence_radius: 200,
     specialites: [], agent_ids: [], pieces_jointes: [], urgences: [], checkpoints_service: [],
     cles: [], alarmes: [], consignes_droits: {}, parametres_envoi: {},
+    company_id: companyId || '',
     ...s,
+    company_id: s?.company_id || companyId || '',
     specialites: s?.specialites || [],
     agent_ids: s?.agent_ids || [],
     pieces_jointes: s?.pieces_jointes || [],
@@ -86,6 +90,12 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
   const [form, setForm] = useState(() => normalize(site));
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(normalize(site || null));
+    setActiveTab('general');
+  }, [site, open, companyId]);
 
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -116,11 +126,11 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
     e?.preventDefault();
     if (!form.name) { toast.error('Le nom du site est obligatoire'); setActiveTab('general'); return; }
     if (!form.client_id) { toast.error('Le client est obligatoire : un site doit être rattaché à un client'); setActiveTab('general'); return; }
-    onSubmit(form);
+    onSubmit({ ...form, company_id: form.company_id || companyId });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="w-[calc(100vw-0.75rem)] max-w-5xl p-0 gap-0 max-h-[100dvh] sm:max-h-[92vh] overflow-hidden flex flex-col [&>button]:hidden">
         <DialogTitle className="sr-only">{site ? 'Modifier le site' : 'Ajout d\'un site'}</DialogTitle>
 

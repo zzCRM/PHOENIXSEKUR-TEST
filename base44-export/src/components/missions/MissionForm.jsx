@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,12 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
+const EMPTY = {
+  title: '', site_id: '', site_name: '', client_id: '', client_name: '',
+  agent_id: '', agent_name: '', date: '', start_time: '', end_time: '',
+  type: 'gardiennage', status: 'planifiee', notes: '', report: '',
+};
+
 export default function MissionForm({ open, onClose, onSubmit, mission, agents = [], sites = [], clients = [] }) {
-  const [form, setForm] = useState(mission || {
-    title: '', site_id: '', site_name: '', client_id: '', client_name: '',
-    agent_id: '', agent_name: '', date: '', start_time: '', end_time: '',
-    type: 'gardiennage', status: 'planifiee', notes: '', report: ''
-  });
+  const [form, setForm] = useState(mission || { ...EMPTY });
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(mission ? { ...EMPTY, ...mission } : { ...EMPTY });
+  }, [mission, open]);
 
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
