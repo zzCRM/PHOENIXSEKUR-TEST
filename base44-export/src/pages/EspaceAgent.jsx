@@ -27,7 +27,8 @@ import ServiceChrono from '@/components/agent/ServiceChrono';
 import ServiceNonPlanifie from '@/components/agent/ServiceNonPlanifie';
 import ServiceEnCours from '@/components/agent/ServiceEnCours';
 import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpand';
-import { mergeAgentDroits, assignedSiteIds } from '@/lib/agentPortal';
+import { mergeAgentDroits, assignedSiteIds, accountDisplayName } from '@/lib/agentPortal';
+import MonthPlanningHome from '@/components/planning/MonthPlanningHome';
 import { canStartPlannedService } from '@/lib/serviceStartRules';
 
 const CATEGORY_CONFIG = {
@@ -112,10 +113,7 @@ export default function EspaceAgent() {
   });
 
   const droits = mergeAgentDroits(agentFiche);
-  const agentName = user
-    ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()
-      || `${agentFiche?.first_name || ''} ${agentFiche?.last_name || ''}`.trim())
-    : `${agentFiche?.first_name || ''} ${agentFiche?.last_name || ''}`.trim();
+  const agentName = accountDisplayName(user, agentFiche);
 
   const { data: missions = [] } = useQuery({
     queryKey: ['missions', companyId, agentFiche?.id],
@@ -420,10 +418,43 @@ export default function EspaceAgent() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="sticky z-20 -mx-3 sm:-mx-4 xl:-mx-8 px-3 sm:px-4 xl:px-8 bg-background/95 backdrop-blur border-b mb-4 top-0 overflow-x-auto tabs-scroll">
+          <TabsList className="flex w-max min-w-full h-12 bg-transparent p-0 rounded-none justify-start gap-0 flex-nowrap">
+            {[
+              { value: 'accueil', label: 'Accueil', show: true },
+              { value: 'service', label: 'Service', show: droits.acces_services },
+              { value: 'nonplanifie', label: 'Non planifié', show: droits.acces_service_non_planifie },
+              { value: 'pti', label: 'DATI / PTI', show: droits.acces_pti },
+              { value: 'planning', label: 'Planning', show: droits.acces_planning },
+              { value: 'rondes', label: 'Rondes', show: droits.acces_rondes },
+              { value: 'checkpoints', label: 'Contrôles', show: droits.acces_points_controle },
+              { value: 'maincourante', label: 'Main courante', show: droits.acces_main_courante },
+              { value: 'ecarts', label: 'Écarts', show: droits.acces_ecarts },
+              { value: 'consignes', label: 'Consignes', show: droits.acces_consignes, badge: newConsignes.length },
+              { value: 'carte', label: 'Carte pro', show: droits.acces_carte_pro },
+              { value: 'contact', label: 'Agence', show: droits.acces_contact_societe },
+              { value: 'documents', label: 'Documents', show: droits.acces_documents },
+              { value: 'demandes', label: 'Demandes', show: droits.acces_conges },
+            ].filter((t) => t.show).map((t) => (
+              <TabsTrigger
+                key={t.value}
+                value={t.value}
+                className="relative shrink-0 rounded-none h-12 px-3.5 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground"
+              >
+                {t.label}
+                {t.badge > 0 && (
+                  <span className="ml-1 inline-flex w-4 h-4 bg-amber-500 text-white rounded-full text-[10px] items-center justify-center">{t.badge}</span>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+
+      <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Espace Agent</h1>
-          <p className="text-muted-foreground mt-1">Bonjour {agentName || 'Agent'}</p>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Bonjour {agentName || 'collaborateur'}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Espace Agent</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {currentService && (
@@ -449,31 +480,6 @@ export default function EspaceAgent() {
           )}
         </div>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 flex-wrap h-auto gap-1">
-          <TabsTrigger value="accueil">Accueil</TabsTrigger>
-          {droits.acces_services && <TabsTrigger value="service">Service</TabsTrigger>}
-          {droits.acces_service_non_planifie && <TabsTrigger value="nonplanifie">Non planifié</TabsTrigger>}
-          {droits.acces_pti && <TabsTrigger value="pti">PTI</TabsTrigger>}
-          {droits.acces_planning && <TabsTrigger value="planning">Planning</TabsTrigger>}
-          {droits.acces_rondes && <TabsTrigger value="rondes">Rondes</TabsTrigger>}
-          {droits.acces_points_controle && <TabsTrigger value="checkpoints">Contrôles</TabsTrigger>}
-          {droits.acces_main_courante && <TabsTrigger value="maincourante">Main courante</TabsTrigger>}
-          {droits.acces_ecarts && <TabsTrigger value="ecarts">Écarts</TabsTrigger>}
-          {droits.acces_consignes && (
-            <TabsTrigger value="consignes" className="relative">
-              Consignes
-              {newConsignes.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white rounded-full text-[10px] flex items-center justify-center">{newConsignes.length}</span>
-              )}
-            </TabsTrigger>
-          )}
-          {droits.acces_carte_pro && <TabsTrigger value="carte">Carte pro</TabsTrigger>}
-          {droits.acces_contact_societe && <TabsTrigger value="contact">Agence</TabsTrigger>}
-          {droits.acces_documents && <TabsTrigger value="documents">Documents</TabsTrigger>}
-          {droits.acces_conges && <TabsTrigger value="demandes">Demandes</TabsTrigger>}
-        </TabsList>
 
         <TabsContent value="accueil" className="space-y-4">
           {droits.acces_consignes && (
@@ -523,30 +529,28 @@ export default function EspaceAgent() {
             </button>
           )}
 
-          {droits.acces_planning && (
-            <Card className="p-5">
-              <h2 className="font-semibold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4" />Mon planning — aujourd’hui et à venir</h2>
-              {futureMissions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune vacation planifiée. Si un service vient d’être créé, actualisez la page.</p>
-              ) : (
-                <div className="space-y-2">
-                  {futureMissions.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-xl">
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{m.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {normalizeDateKey(m.date) === today ? "Aujourd'hui" : normalizeDateKey(m.date)} • {m.site_name} • {m.start_time}-{m.end_time}
-                        </p>
-                      </div>
-                      {droits.acces_services && normalizeDateKey(m.date) === today && !currentService && (
-                        <Button size="sm" onClick={() => openPrise(m)} className="gap-1.5 shrink-0" disabled={!canStartPlannedService(m).ok}>
-                          <Clock className="w-3.5 h-3.5" /> {canStartPlannedService(m).ok ? 'Prendre le service' : `Dès ${m.start_time}`}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+          <MonthPlanningHome
+            title="Mes vacations du mois"
+            missions={myMissions}
+            prises={services}
+            sites={sites}
+            currentService={currentService}
+            onOpenMission={(m, meta) => {
+              if (meta?.enCours) { setActiveTab('service'); return; }
+              if (normalizeDateKey(m.date) === today && droits.acces_services && !currentService) openPrise(m);
+              else if (droits.acces_planning) setActiveTab('planning');
+            }}
+          />
+
+          {currentService && droits.acces_pti && (
+            <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => setActiveTab('pti')}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" /> DATI / PTI actif</p>
+                  <p className="text-xs text-muted-foreground">Confirmez votre présence toutes les {intervalMinutes} min</p>
                 </div>
-              )}
+                <span className={`font-mono font-bold ${overdue ? 'text-red-600' : 'text-primary'}`}>{timeLabel}</span>
+              </div>
             </Card>
           )}
         </TabsContent>
@@ -607,7 +611,8 @@ export default function EspaceAgent() {
           {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
             <Card className={`p-8 text-center border-2 ${overdue ? 'border-red-500 bg-red-50' : 'border-border'}`}>
               <Shield className={`w-16 h-16 mx-auto mb-4 ${overdue ? 'text-red-600' : 'text-muted-foreground'}`} />
-              <h2 className="text-xl font-bold mb-2">Protection Travailleur Isolé</h2>
+              <h2 className="text-xl font-bold mb-2">DATI / PTI</h2>
+              <p className="text-xs text-muted-foreground mb-2">Dispositif d’alarme pour travailleur isolé</p>
               <p className="text-muted-foreground mb-4 text-sm">
                 Confirmez votre présence toutes les {intervalMinutes} minutes
               </p>

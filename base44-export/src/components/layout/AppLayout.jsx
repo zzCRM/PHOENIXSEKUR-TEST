@@ -7,13 +7,14 @@ import RGPDConsent from '@/components/rgpd/RGPDConsent';
 import { Menu, Search, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
-import { isFieldAgent } from '@/lib/agentPortal';
+import { accountDisplayName, isFieldAgent } from '@/lib/agentPortal';
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout, user } = useAuth();
   const agentPortal = isFieldAgent(user);
+  const displayName = accountDisplayName(user);
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -73,9 +74,9 @@ export default function AppLayout() {
                 <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
                   {agentPortal ? 'Espace Agent' : 'Phoenix Sekur'}
                 </p>
-                {user?.email && (
-                  <p className="text-[11px] text-gray-500 truncate leading-tight">{user.email}</p>
-                )}
+                <p className="text-[11px] text-gray-500 truncate leading-tight">
+                  {displayName || user?.email || ''}
+                </p>
               </div>
 
               <button
@@ -102,7 +103,9 @@ export default function AppLayout() {
 
         {/* Barre desktop : déconnexion toujours accessible */}
         <div className="hidden xl:flex items-center justify-end gap-2 px-6 py-2 border-b border-gray-100 bg-white/80">
-          <span className="text-xs text-muted-foreground truncate max-w-[280px]">{user?.email}</span>
+          <span className="text-xs text-muted-foreground truncate max-w-[280px]">
+            {displayName || user?.email}
+          </span>
           <button
             type="button"
             onClick={() => logout()}

@@ -12,7 +12,7 @@ export const DEFAULT_DROITS_AGENT = {
   acces_contact_societe: true,
   acces_ecarts: false,
   acces_main_courante: false,
-  acces_pti: false,
+  acces_pti: true,
   acces_documents: false,
   acces_fiches_paie: false,
 };
@@ -29,7 +29,7 @@ export const DROITS_AGENT_OPTIONS = [
   { key: 'acces_contact_societe', label: 'Contacter l’agence', description: 'Coordonnées de la société de sécurité' },
   { key: 'acces_ecarts', label: 'Écarts horaires', description: 'Consulter ses écarts horaires' },
   { key: 'acces_main_courante', label: 'Main courante', description: 'Consulter et saisir la main courante du site' },
-  { key: 'acces_pti', label: 'PTI', description: 'Protection du travailleur isolé' },
+  { key: 'acces_pti', label: 'DATI / PTI', description: 'Dispositif d’alarme pour travailleur isolé' },
   { key: 'acces_documents', label: 'Documents', description: 'Documents personnels et fiches de paie' },
 ];
 
@@ -45,6 +45,52 @@ export function mergeAgentDroits(agent) {
     ...flat,
     ...(agent?.droits_portail || {}),
   };
+}
+
+function isPlaceholderName(part) {
+  const s = String(part || '').trim();
+  if (!s) return true;
+  return /^(so|test|user|admin|n\/?a|xxx|\.+)$/i.test(s);
+}
+
+function formatNomPrenom(last, first) {
+  const l = String(last || '').trim();
+  const f = String(first || '').trim();
+  if (!l && !f) return '';
+  const prenom = f ? f.charAt(0).toUpperCase() + f.slice(1) : '';
+  return [l.toUpperCase(), prenom].filter(Boolean).join(' ');
+}
+
+function pickNamePair(...pairs) {
+  for (const [last, first] of pairs) {
+    const l = String(last || '').trim();
+    const f = String(first || '').trim();
+    const useL = isPlaceholderName(l) ? '' : l;
+    const useF = isPlaceholderName(f) ? '' : f;
+    if (useL || useF) return formatNomPrenom(useL, useF);
+  }
+  return '';
+}
+
+/** Nom affiché : NOM Prénom du titulaire du compte / de la fiche. */
+export function accountDisplayName(user, fiche) {
+  const fromFields = pickNamePair(
+    [fiche?.last_name, fiche?.first_name],
+    [user?.last_name, user?.first_name],
+  );
+  if (fromFields) return fromFields;
+
+  const full = String(user?.full_name || '').trim();
+  if (full && !/^so(\s+so)?$/i.test(full)) {
+    const parts = full.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return pickNamePair(['', parts[0]]);
+    return pickNamePair([parts.slice(1).join(' '), parts[0]]);
+  }
+
+  const local = String(user?.email || '').split('@')[0] || '';
+  const bits = local.split(/[._-]+/).filter((b) => b && !/^\d+$/.test(b));
+  if (bits.length >= 2) return formatNomPrenom(bits.slice(1).join(' '), bits[0]);
+  return '';
 }
 
 export function isFieldAgent(user) {

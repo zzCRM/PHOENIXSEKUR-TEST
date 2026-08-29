@@ -137,3 +137,11 @@ html, body, #root {
 .addr-ac-host input::placeholder {
   color: hsl(var(--muted-foreground));
 }
+
+.tabs-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
+}

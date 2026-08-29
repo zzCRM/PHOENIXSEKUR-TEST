@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeAgentDroits, assignedSiteIds, DEFAULT_DROITS_AGENT } from './agentPortal.js';
+import { mergeAgentDroits, assignedSiteIds, DEFAULT_DROITS_AGENT, accountDisplayName } from './agentPortal.js';
 
 test('droits par défaut : planning, demandes, non planifié, rondes, consignes, carte, contact', () => {
   const d = mergeAgentDroits(null);
@@ -11,7 +11,7 @@ test('droits par défaut : planning, demandes, non planifié, rondes, consignes,
   assert.equal(d.acces_consignes, true);
   assert.equal(d.acces_carte_pro, true);
   assert.equal(d.acces_contact_societe, true);
-  assert.equal(d.acces_pti, false);
+  assert.equal(d.acces_pti, true);
   assert.equal(d.acces_documents, false);
 });
 
@@ -23,6 +23,24 @@ test('droits_portail société écrase les défauts', () => {
   assert.equal(d.acces_planning, false);
   assert.equal(d.acces_pti, true);
   assert.equal(d.acces_rondes, DEFAULT_DROITS_AGENT.acces_rondes);
+});
+
+test('accountDisplayName : NOM Prénom depuis fiche puis compte', () => {
+  assert.equal(
+    accountDisplayName({ first_name: 'Mohamed', last_name: 'Boulaghmoudi' }),
+    'BOULAGHMOUDI Mohamed',
+  );
+  assert.equal(
+    accountDisplayName(
+      { first_name: 'So', last_name: 'So', email: 'soraya.rayeh@gmail.com' },
+      { first_name: 'Soraya', last_name: 'Rayeh' },
+    ),
+    'RAYEH Soraya',
+  );
+  assert.equal(
+    accountDisplayName({ first_name: 'So', last_name: 'So', email: 'soraya.rayeh@gmail.com' }),
+    'RAYEH Soraya',
+  );
 });
 
 test('sites affectés = missions + agent_ids du site', () => {
