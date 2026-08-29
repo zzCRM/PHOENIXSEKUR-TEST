@@ -28,7 +28,7 @@ import ServiceNonPlanifie from '@/components/agent/ServiceNonPlanifie';
 import ServiceEnCours from '@/components/agent/ServiceEnCours';
 import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpand';
 import { mergeAgentDroits, assignedSiteIds, accountDisplayName } from '@/lib/agentPortal';
-import MonthPlanningHome from '@/components/planning/MonthPlanningHome';
+import PlanningMapView from '@/components/planning/PlanningMapView';
 import { canStartPlannedService } from '@/lib/serviceStartRules';
 
 const CATEGORY_CONFIG = {
@@ -89,6 +89,7 @@ export default function EspaceAgent() {
   const [selectedConsigne, setSelectedConsigne] = useState(null);
   const [showDemandeForm, setShowDemandeForm] = useState(false);
   const [demandeForm, setDemandeForm] = useState({ subject: '', message: '' });
+  const [planDay, setPlanDay] = useState(() => new Date());
   const [lastSeenConsignes, setLastSeenConsignes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('last_seen_consignes') || '{}'); } catch { return {}; }
   });
@@ -529,11 +530,12 @@ export default function EspaceAgent() {
             </button>
           )}
 
-          <MonthPlanningHome
-            title="Mes vacations du mois"
+          <PlanningMapView
             missions={myMissions}
             prises={services}
             sites={sites}
+            selected={planDay}
+            onSelectDay={setPlanDay}
             currentService={currentService}
             onOpenMission={(m, meta) => {
               if (meta?.enCours) { setActiveTab('service'); return; }

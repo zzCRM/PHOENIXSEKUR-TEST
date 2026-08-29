@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Search, Plus, CalendarDays, Download, FileText, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Plus, CalendarDays, Download, FileText, LayoutGrid, MapPin } from 'lucide-react';
 import MonthPlanningHome from '@/components/planning/MonthPlanningHome';
 import PlanningVacationSheet from '@/components/planning/PlanningVacationSheet';
+import PlanningMapView from '@/components/planning/PlanningMapView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +38,7 @@ export default function PlanningAvance() {
   const { companyId, isAdmin } = useCompany();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
-  const [view, setView] = useState('calendrier');
+  const [view, setView] = useState('carte');
   const [search, setSearch] = useState('');
   const [showAjoutService, setShowAjoutService] = useState(false);
   const [sheet, setSheet] = useState(null);
@@ -249,7 +250,7 @@ export default function PlanningAvance() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight capitalize">
               {format(currentDate, 'MMMM yyyy', { locale: fr })}
             </h1>
-            <p className="text-sm text-muted-foreground">Touchez un jour, puis une vacation</p>
+            <p className="text-sm text-muted-foreground">Carte des sites — glissez les tickets du jour</p>
           </div>
           <Button onClick={() => setShowAjoutService(true)} className="gap-1.5 h-10 shrink-0">
             <Plus className="w-4 h-4" /> Ajouter
@@ -258,6 +259,16 @@ export default function PlanningAvance() {
 
         <div className="flex items-center gap-2 overflow-x-auto tabs-scroll pb-0.5">
           <div className="flex rounded-xl border border-border bg-muted/40 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setView('carte')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium',
+                view === 'carte' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+              )}
+            >
+              <MapPin className="w-4 h-4" /> Carte
+            </button>
             <button
               type="button"
               onClick={() => setView('calendrier')}
@@ -329,6 +340,17 @@ export default function PlanningAvance() {
           </div>
         )}
       </div>
+
+      {view === 'carte' && (
+        <PlanningMapView
+          missions={filteredMissions}
+          sites={sites}
+          prises={prises}
+          selected={selectedDay}
+          onSelectDay={setSelectedDay}
+          onOpenMission={(m) => setSheet({ missions: [m], date: selectedDay })}
+        />
+      )}
 
       {view === 'calendrier' && (
         <MonthPlanningHome

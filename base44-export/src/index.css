@@ -145,3 +145,12 @@ html, body, #root {
 .tabs-scroll::-webkit-scrollbar {
   display: none;
 }
+
+.leaflet-container {
+  font-family: inherit;
+  background: #e8eef2;
+}
+.carte-pin {
+  background: none !important;
+  border: none !important;
+}

@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { accountDisplayName } from '@/lib/agentPortal';
-import MonthPlanningHome from '@/components/planning/MonthPlanningHome';
+import PlanningMapView from '@/components/planning/PlanningMapView';
 import { useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -93,6 +93,7 @@ function TopStatCard({ icon: Icon, value, label, to, color = "bg-[#6C757D]" }) {
 export default function Dashboard() {
   const { companyId, isAdmin, user } = useCompany();
   const navigate = useNavigate();
+  const [planDay, setPlanDay] = useState(() => new Date());
   const [searchServices, setSearchServices] = useState("");
   const [searchMissions, setSearchMissions] = useState("");
 
@@ -184,15 +185,17 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight text-gray-900">
           Bonjour {accountDisplayName(user) || user?.email || 'la société'}
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">Tableau de bord — planning du mois</p>
+        <p className="text-muted-foreground mt-1 text-sm">Tableau de bord — carte des vacations</p>
       </div>
 
-      <MonthPlanningHome
-        title="Planning du mois — vacations de la société"
+      <PlanningMapView
         missions={missions}
         prises={prises}
         sites={sites}
+        selected={planDay}
+        onSelectDay={setPlanDay}
         onOpenMission={() => navigate('/planning')}
+        compact
       />
 
       {/* 3 cartes statistiques du haut — reliées aux pages */}
