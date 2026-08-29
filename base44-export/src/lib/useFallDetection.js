@@ -1,8 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isLossOfVerticality, tiltFromVertical } from '@/lib/fallDetect';
+import { isFlatFromBeta, isLossOfVerticality, tiltFromVertical } from '@/lib/fallDetect';
+import { unlockPtiAudio } from '@/lib/ptiAlarm';
 
 const CANCEL_SEC = 20;
-const HOLD_MS = 10000;
+const HOLD_MS = 5000;
+
+async function requestMotionPermission() {
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      const res = await DeviceMotionEvent.requestPermission();
+      if (res !== 'granted') return false;
+    }
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try { await DeviceOrientationEvent.requestPermission(); } catch { /* optionnel */ }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function useFallDetection({ active, onFallConfirmed }) {
   const [armed, setArmed] = useState(false);
@@ -21,7 +37,17 @@ export function useFallDetection({ active, onFallConfirmed }) {
     setCancelLeft(CANCEL_SEC);
   }, []);
 
-  const requestArm = useCallback(() => setArmNonce((n) => n + 1), []);
+  const triggerPreAlarm = useCallback(() => {
+    pendingRef.current = true;
+    setPending(true);
+    setCancelLeft(CANCEL_SEC);
+  }, []);
+
+  const requestArm = useCallback(async () => {
+    await requestMotionPermission();
+    await unlockPtiAudio();
+    setArmNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (!active) {
@@ -31,12 +57,9 @@ export function useFallDetection({ active, onFallConfirmed }) {
     }
 
     let cancelled = false;
-    const handler = (e) => {
-      const a = e.accelerationIncludingGravity || e.acceleration;
-      if (!a) return;
-      const tilt = tiltFromVertical(a.x, a.y, a.z);
+    const noteLoss = (lost) => {
       if (pendingRef.current) return;
-      if (isLossOfVerticality(tilt)) {
+      if (lost) {
         if (!lossSinceRef.current) lossSinceRef.current = Date.now();
         if (Date.now() - lossSinceRef.current >= HOLD_MS) {
           pendingRef.current = true;
@@ -48,24 +71,38 @@ export function useFallDetection({ active, onFallConfirmed }) {
       }
     };
 
+    const motionLost = { current: false };
+    const orientLost = { current: false };
+    const noteCombined = () => noteLoss(motionLost.current || orientLost.current);
+
+    const motionHandler = (e) => {
+      const a = e.accelerationIncludingGravity || e.acceleration;
+      if (!a) return;
+      motionLost.current = isLossOfVerticality(tiltFromVertical(a.x, a.y, a.z));
+      noteCombined();
+    };
+    const orientHandler = (e) => {
+      orientLost.current = isFlatFromBeta(e.beta);
+      noteCombined();
+    };
+
     const start = async () => {
-      try {
-        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-          const res = await DeviceMotionEvent.requestPermission();
-          if (res !== 'granted' || cancelled) return;
-        }
-        if (cancelled) return;
-        window.addEventListener('devicemotion', handler, { passive: true });
-        setArmed(true);
-      } catch {
-        if (!cancelled) setArmed(false);
+      const ok = await requestMotionPermission();
+      if (cancelled) return;
+      if (ok === false) {
+        setArmed(false);
+        return;
       }
+      window.addEventListener('devicemotion', motionHandler, { passive: true });
+      window.addEventListener('deviceorientation', orientHandler, { passive: true });
+      setArmed(true);
     };
     start();
 
     return () => {
       cancelled = true;
-      window.removeEventListener('devicemotion', handler);
+      window.removeEventListener('devicemotion', motionHandler);
+      window.removeEventListener('deviceorientation', orientHandler);
       setArmed(false);
     };
   }, [active, armNonce, cancelFall]);
@@ -87,5 +124,5 @@ export function useFallDetection({ active, onFallConfirmed }) {
     return () => clearInterval(id);
   }, [pending]);
 
-  return { armed, pending, cancelLeft, cancelFall, requestArm };
+  return { armed, pending, cancelLeft, cancelFall, requestArm, triggerPreAlarm };
 }

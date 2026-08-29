@@ -6,8 +6,15 @@ export function tiltFromVertical(x, y, z) {
   return (Math.acos(cos) * 180) / Math.PI;
 }
 
-export function isLossOfVerticality(tiltDeg, thresholdDeg = 50) {
+export function isLossOfVerticality(tiltDeg, thresholdDeg = 40) {
   return Number(tiltDeg) >= thresholdDeg;
+}
+
+/** DeviceOrientation beta : ~90 = debout, ~0 ou ~180 = à plat. */
+export function isFlatFromBeta(beta) {
+  if (beta == null || Number.isNaN(Number(beta))) return false;
+  const a = Math.abs(Number(beta));
+  return a < 45 || a > 135;
 }
 
 export function magnitude(x, y, z) {

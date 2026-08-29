@@ -19,23 +19,57 @@ export function plannedStartAt(mission) {
   return parseDateTime(mission.date, mission.start_time);
 }
 
+/** Fin planifiée ; si l’heure de fin ≤ début, c’est le lendemain (vacation de nuit). */
+export function plannedWindowEnd(date, startTime, endTime) {
+  const start = parseDateTime(date, startTime);
+  const end = parseDateTime(date, endTime);
+  if (!end) return null;
+  if (start && end.getTime() <= start.getTime()) {
+    return new Date(end.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return end;
+}
+
+export function plannedEndAt(mission) {
+  if (!mission) return null;
+  return plannedWindowEnd(mission.date, mission.start_time, mission.end_time);
+}
+
+export function isServiceOverdue(service, now = new Date()) {
+  if (!service || service.status !== 'en_service') return false;
+  const end = plannedWindowEnd(service.date, service.planned_start, service.planned_end);
+  if (!end) return false;
+  return now.getTime() >= end.getTime();
+}
+
 /**
- * Interdit la prise de service avant l'heure planifiée.
+ * Interdit la prise avant l’heure planifiée ET après l’heure de fin.
+ * Un service terminé ne se reprend pas hors horaires : seule une
+ * prolongation (pendant le service) permet de dépasser la fin.
  * Les services non planifiés restent libres.
  */
 export function canStartPlannedService(mission, now = new Date()) {
-  if (!mission || mission.unplanned) return { ok: true, late: false };
+  if (!mission || mission.unplanned) return { ok: true, late: false, tooLate: false };
   const start = plannedStartAt(mission);
-  if (!start) return { ok: true, late: false };
-  if (now < start) {
+  const end = plannedEndAt(mission);
+  if (start && now < start) {
     return {
       ok: false,
       late: false,
+      tooLate: false,
       reason: `La prise de service est bloquée jusqu’à ${mission.start_time} (heure planifiée).`,
     };
   }
-  const lateMs = now.getTime() - start.getTime();
-  return { ok: true, late: lateMs > 3 * 60 * 1000 };
+  if (end && now.getTime() >= end.getTime()) {
+    return {
+      ok: false,
+      late: false,
+      tooLate: true,
+      reason: `Ce service s’est terminé à ${mission.end_time}. Vous ne pouvez plus le reprendre. Pour rester plus longtemps, déclarez une prolongation pendant le service.`,
+    };
+  }
+  const lateMs = start ? now.getTime() - start.getTime() : 0;
+  return { ok: true, late: lateMs > 3 * 60 * 1000, tooLate: false };
 }
 
 export function resolvePriseMode(site) {

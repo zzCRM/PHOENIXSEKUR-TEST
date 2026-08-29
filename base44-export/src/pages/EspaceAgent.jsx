@@ -31,7 +31,7 @@ import ServiceEnCours from '@/components/agent/ServiceEnCours';
 import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpand';
 import { mergeAgentDroits, assignedSiteIds, accountDisplayName } from '@/lib/agentPortal';
 import PlanningMapView from '@/components/planning/PlanningMapView';
-import { canStartPlannedService } from '@/lib/serviceStartRules';
+import { canStartPlannedService, isServiceOverdue } from '@/lib/serviceStartRules';
 
 const CATEGORY_CONFIG = {
   general: { label: 'Général', color: 'bg-gray-100 text-gray-700' },
@@ -322,7 +322,7 @@ export default function EspaceAgent() {
     toast.error('Alerte PTI envoyée');
   };
 
-  const { pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
+  const { armed: ptiArmed, pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm, triggerPreAlarm } = useFallDetection({
     active: !!currentService && droits.acces_pti,
     onFallConfirmed: () => {
       handlePtiAlerte('⚠️ ALERTE PTI — perte de verticalité');
@@ -359,6 +359,11 @@ export default function EspaceAgent() {
   };
 
   const startRonde = async (ronde) => {
+    if (currentService && isServiceOverdue(currentService) && !currentService.prolongation_motif) {
+      toast.error('Heure de fin dépassée : déclarez une prolongation avec motif avant de continuer.');
+      setActiveTab('service');
+      return;
+    }
     const now = format(new Date(), 'HH:mm');
     await alerteMut.mutateAsync({
       company_id: companyId, type: 'debut_ronde', agent_id: priseAgentId, agent_name: agentName,
@@ -532,7 +537,7 @@ export default function EspaceAgent() {
           </div>
 
           {currentService && droits.acces_pti && (
-            <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => setActiveTab('pti')}>
+            <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => { requestArm(); setActiveTab('pti'); }}>
               <div>
                 <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" /> DATI / PTI actif</p>
                 <p className="text-xs text-muted-foreground">Perte de verticalité armée — appel d’urgence disponible</p>
@@ -568,7 +573,13 @@ export default function EspaceAgent() {
                           <p className="text-sm text-muted-foreground">{m.site_name} • {m.start_time} - {m.end_time}</p>
                         </div>
                         <Button onClick={() => openPrise(m)} className="gap-2" disabled={!canStartPlannedService(m).ok}>
-                          <Clock className="w-4 h-4" /> {canStartPlannedService(m).ok ? 'Prendre le service' : `Dès ${m.start_time}`}
+                          <Clock className="w-4 h-4" /> {
+                            canStartPlannedService(m).ok
+                              ? 'Prendre le service'
+                              : canStartPlannedService(m).tooLate
+                                ? 'Hors horaires'
+                                : `Dès ${m.start_time}`
+                          }
                         </Button>
                       </div>
                     ))}
@@ -597,12 +608,14 @@ export default function EspaceAgent() {
           {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
             <PtiModernScreen
               active={!!currentService}
+              armed={ptiArmed}
               siteName={currentService?.site_name}
               fallPending={fallPending}
               fallCancelLeft={fallCancelLeft}
-              onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
+              onSos={() => { cancelFall(); handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`); }}
               onCancelFall={cancelFall}
               onArmSensors={requestArm}
+              onTestAlarm={triggerPreAlarm}
             />
           )}
         </TabsContent>
@@ -617,7 +630,7 @@ export default function EspaceAgent() {
                     key={m.id}
                     mission={m}
                     today={today}
-                    trailing={droits.acces_services && normalizeDateKey(m.date) === today && !currentService ? (
+                    trailing={droits.acces_services && normalizeDateKey(m.date) === today && !currentService && canStartPlannedService(m).ok ? (
                       <Button size="sm" onClick={() => openPrise(m)}>Pointer</Button>
                     ) : null}
                   />
@@ -940,7 +953,7 @@ export default function EspaceAgent() {
       <PtiCheckOverlay
         open={!!currentService && droits.acces_pti && !showPriseForm && !showFinService && fallPending}
         fallCancelLeft={fallCancelLeft}
-        onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
+        onSos={() => { cancelFall(); handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`); }}
         onCancelFall={cancelFall}
       />
 
@@ -956,7 +969,7 @@ export default function EspaceAgent() {
               companyId={companyId}
               agentId={priseAgentId}
               agentName={agentName}
-              onSuccess={() => { setShowPriseForm(false); setSelectedMission(null); qc.invalidateQueries({ queryKey: ['prises_service'] }); }}
+              onSuccess={() => { setShowPriseForm(false); setSelectedMission(null); qc.invalidateQueries({ queryKey: ['prises_service'] }); requestArm(); }}
             />
           )}
         </DialogContent>

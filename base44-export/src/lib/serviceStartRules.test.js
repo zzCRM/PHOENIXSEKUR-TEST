@@ -8,11 +8,28 @@ import {
 } from './serviceStartRules.js';
 
 test('bloque la prise avant l’heure planifiée', () => {
-  const mission = { date: '2026-08-29', start_time: '06:30' };
+  const mission = { date: '2026-08-29', start_time: '06:30', end_time: '19:00' };
   const before = new Date('2026-08-29T06:00:00');
   const atTime = new Date('2026-08-29T06:30:00');
   assert.equal(canStartPlannedService(mission, before).ok, false);
   assert.equal(canStartPlannedService(mission, atTime).ok, true);
+});
+
+test('refuse de reprendre un service après l’heure de fin', () => {
+  const mission = { date: '2026-08-29', start_time: '06:30', end_time: '11:00' };
+  const during = new Date('2026-08-29T09:00:00');
+  const after = new Date('2026-08-29T12:00:00');
+  assert.equal(canStartPlannedService(mission, during).ok, true);
+  const late = canStartPlannedService(mission, after);
+  assert.equal(late.ok, false);
+  assert.equal(late.tooLate, true);
+});
+
+test('vacation de nuit : la fin est le lendemain', () => {
+  const mission = { date: '2026-08-29', start_time: '19:00', end_time: '06:30' };
+  assert.equal(canStartPlannedService(mission, new Date('2026-08-29T22:00:00')).ok, true);
+  assert.equal(canStartPlannedService(mission, new Date('2026-08-30T05:00:00')).ok, true);
+  assert.equal(canStartPlannedService(mission, new Date('2026-08-30T08:00:00')).ok, false);
 });
 
 test('service non planifié toujours autorisé', () => {
