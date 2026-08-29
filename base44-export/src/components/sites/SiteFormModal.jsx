@@ -72,7 +72,7 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
     name: '', client_id: '', client_name: '', type: 'gardiennage', status: 'actif',
     address: '', address_complement: '', city: '', postal_code: '', country: 'FRANCE',
     latitude: null, longitude: null, photo_url: '', instructions: '', nfc_tag_id: '', nfc_tag_fin_id: '',
-    geofence_radius: 200, prise_service_mode: 'geolocalisation', pointage_arrivee: false, pointage_depart: false,
+    geofence_radius: 200, prise_service_mode: '', pointage_arrivee: false, pointage_depart: false,
     specialites: [], agent_ids: [], pieces_jointes: [], urgences: [], checkpoints_service: [],
     cles: [], alarmes: [], consignes_droits: {}, parametres_envoi: {},
     company_id: companyId || '',
