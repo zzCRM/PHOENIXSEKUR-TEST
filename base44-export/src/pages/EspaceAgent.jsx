@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Shield, Clock, AlertTriangle, CheckCircle2, Download, MapPin, Navigation,
+  Clock, AlertTriangle, CheckCircle2, Download, MapPin, Navigation,
   BookOpen, Bell, Calendar, Lock, Phone, Mail, CreditCard, Building2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
