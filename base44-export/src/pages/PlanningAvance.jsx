@@ -227,7 +227,7 @@ export default function PlanningAvance() {
   };
 
   return (
-    <div className="space-y-4 relative">
+    <div className={cn('relative', view === 'carte' ? 'space-y-0' : 'space-y-4')}>
       <AjoutServiceModal
         open={showAjoutService}
         onClose={() => { setShowAjoutService(false); setEditMission(null); }}
@@ -244,6 +244,26 @@ export default function PlanningAvance() {
         onAction={(action, list) => handleContextAction(action, list)}
       />
 
+      {view === 'carte' && (
+        <div className="absolute top-3 left-3 right-3 z-[500] flex items-center justify-between gap-2 pointer-events-none">
+          <div className="pointer-events-auto flex rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border border-white/70 p-0.5">
+            <button type="button" onClick={() => setView('carte')} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium bg-slate-900 text-white">
+              <MapPin className="w-4 h-4" /> Carte
+            </button>
+            <button type="button" onClick={() => setView('calendrier')} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium text-slate-600">
+              <CalendarDays className="w-4 h-4" /> Calendrier
+            </button>
+            <button type="button" onClick={() => setView('grille')} className="hidden xl:inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium text-slate-600">
+              <LayoutGrid className="w-4 h-4" /> Tableau
+            </button>
+          </div>
+          <Button onClick={() => setShowAjoutService(true)} className="pointer-events-auto gap-1.5 h-10 shrink-0 shadow-lg">
+            <Plus className="w-4 h-4" /> Ajouter
+          </Button>
+        </div>
+      )}
+
+      {view !== 'carte' && (
       <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -326,7 +346,7 @@ export default function PlanningAvance() {
         </div>
 
         {/* Bandeau jours fériés */}
-        {feriesDuMois.length > 0 && (
+        {view !== 'carte' && feriesDuMois.length > 0 && (
           <div className="flex items-start gap-2 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
             <span className="font-semibold text-red-700 mt-0.5 shrink-0">Jours fériés :</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -340,16 +360,20 @@ export default function PlanningAvance() {
           </div>
         )}
       </div>
+      )}
 
       {view === 'carte' && (
-        <PlanningMapView
-          missions={filteredMissions}
-          sites={sites}
-          prises={prises}
-          selected={selectedDay}
-          onSelectDay={setSelectedDay}
-          onOpenMission={(m) => setSheet({ missions: [m], date: selectedDay })}
-        />
+        <div className="-mx-3 sm:-mx-4 xl:mx-0 -mb-3 sm:-mb-4 xl:mb-0">
+          <PlanningMapView
+            immersive
+            missions={filteredMissions}
+            sites={sites}
+            prises={prises}
+            selected={selectedDay}
+            onSelectDay={setSelectedDay}
+            onOpenMission={(m) => setSheet({ missions: [m], date: selectedDay })}
+          />
+        </div>
       )}
 
       {view === 'calendrier' && (

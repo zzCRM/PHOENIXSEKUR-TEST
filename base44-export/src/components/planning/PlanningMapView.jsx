@@ -64,6 +64,7 @@ export default function PlanningMapView({
   onSelectDay,
   onOpenMission,
   compact = false,
+  immersive = false,
   currentService,
 }) {
   const [extraCoords, setExtraCoords] = useState({});
@@ -137,7 +138,14 @@ export default function PlanningMapView({
   };
 
   return (
-    <div className={cn('relative overflow-hidden rounded-3xl border border-border bg-[#e8eef2]', compact ? 'h-[420px] sm:h-[480px]' : 'h-[min(72dvh,640px)]')}>
+    <div className={cn(
+      'relative overflow-hidden bg-[#e8eef2]',
+      immersive
+        ? 'h-[calc(100dvh-3.25rem)] xl:h-[calc(100dvh-5.5rem)] rounded-none xl:rounded-3xl xl:border xl:border-border'
+        : compact
+          ? 'h-[68dvh] min-h-[420px] rounded-none xl:rounded-3xl xl:border xl:border-border'
+          : 'h-[min(78dvh,720px)] rounded-3xl border border-border',
+    )}>
       <MapContainer
         center={focusPin ? [focusPin.lat, focusPin.lng] : FR_CENTER}
         zoom={focusPin ? 14 : 6}
@@ -173,7 +181,7 @@ export default function PlanningMapView({
         ))}
       </MapContainer>
 
-      <div className="absolute top-3 left-3 right-3 z-[400] pointer-events-none">
+      <div className={cn('absolute left-3 right-3 z-[400] pointer-events-none', immersive ? 'top-[4.25rem]' : 'top-3')}>
         <div className="pointer-events-auto rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border border-white/70 px-3 py-2">
           <p className="text-[11px] font-medium text-muted-foreground capitalize">
             {format(day, 'EEEE d MMMM yyyy', { locale: fr })}

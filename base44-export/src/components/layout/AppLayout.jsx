@@ -4,8 +4,7 @@ import Sidebar from './Sidebar';
 import CompanyHeader from './CompanyHeader';
 import { cn } from '@/lib/utils';
 import RGPDConsent from '@/components/rgpd/RGPDConsent';
-import { Menu, Search, LogOut } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Menu, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { accountDisplayName, isFieldAgent } from '@/lib/agentPortal';
 
@@ -88,15 +87,6 @@ export default function AppLayout() {
               >
                 <LogOut className="w-5 h-5" />
               </button>
-            </div>
-
-            <div className="relative pb-2.5">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              <Input
-                type="search"
-                placeholder="Rechercher..."
-                className="w-full pl-9 pr-3 h-10 bg-gray-50 border-0 rounded-full text-sm focus-visible:ring-1"
-              />
             </div>
           </div>
         </header>

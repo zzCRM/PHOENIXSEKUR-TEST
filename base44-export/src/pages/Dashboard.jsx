@@ -188,15 +188,17 @@ export default function Dashboard() {
         <p className="text-muted-foreground mt-1 text-sm">Tableau de bord — carte des vacations</p>
       </div>
 
-      <PlanningMapView
-        missions={missions}
-        prises={prises}
-        sites={sites}
-        selected={planDay}
-        onSelectDay={setPlanDay}
-        onOpenMission={() => navigate('/planning')}
-        compact
-      />
+      <div className="-mx-3 sm:-mx-4 xl:mx-0">
+        <PlanningMapView
+          missions={missions}
+          prises={prises}
+          sites={sites}
+          selected={planDay}
+          onSelectDay={setPlanDay}
+          onOpenMission={() => navigate('/planning')}
+          compact
+        />
+      </div>
 
       {/* 3 cartes statistiques du haut — reliées aux pages */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

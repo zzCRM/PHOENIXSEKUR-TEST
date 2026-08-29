@@ -530,19 +530,22 @@ export default function EspaceAgent() {
             </button>
           )}
 
-          <PlanningMapView
-            missions={myMissions}
-            prises={services}
-            sites={sites}
-            selected={planDay}
-            onSelectDay={setPlanDay}
-            currentService={currentService}
-            onOpenMission={(m, meta) => {
-              if (meta?.enCours) { setActiveTab('service'); return; }
-              if (normalizeDateKey(m.date) === today && droits.acces_services && !currentService) openPrise(m);
-              else if (droits.acces_planning) setActiveTab('planning');
-            }}
-          />
+          <div className="-mx-3 sm:-mx-4 xl:mx-0">
+            <PlanningMapView
+              compact
+              missions={myMissions}
+              prises={services}
+              sites={sites}
+              selected={planDay}
+              onSelectDay={setPlanDay}
+              currentService={currentService}
+              onOpenMission={(m, meta) => {
+                if (meta?.enCours) { setActiveTab('service'); return; }
+                if (normalizeDateKey(m.date) === today && droits.acces_services && !currentService) openPrise(m);
+                else if (droits.acces_planning) setActiveTab('planning');
+              }}
+            />
+          </div>
 
           {currentService && droits.acces_pti && (
             <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => setActiveTab('pti')}>
