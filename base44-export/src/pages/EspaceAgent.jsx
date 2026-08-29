@@ -19,6 +19,9 @@ import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { usePtiTimer } from '@/lib/usePtiTimer';
+import { useFallDetection } from '@/lib/useFallDetection';
+import PtiModernScreen from '@/components/agent/PtiModernScreen';
+import PtiCheckOverlay from '@/components/agent/PtiCheckOverlay';
 import { toast } from 'sonner';
 import PriseDeServiceNFC from '@/components/agent/PriseDeServiceNFC';
 import FinDeServicePhoto from '@/components/agent/FinDeServicePhoto';
@@ -325,6 +328,18 @@ export default function EspaceAgent() {
     },
   });
 
+  const handlePtiAlerte = async (reason) => {
+    await triggerPtiAlerte(reason || `⚠️ ALERTE PTI manuelle à ${format(new Date(), 'HH:mm')}`);
+    toast.error('Alerte PTI envoyée');
+  };
+
+  const { armed: fallArmed, pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
+    active: !!currentService && droits.acces_pti,
+    onFallConfirmed: () => {
+      handlePtiAlerte('⚠️ ALERTE PTI — chute détectée (smartphone)');
+    },
+  });
+
   const agentSiteIds = siteIdSet;
   const mcFiltered = mainCouranteData.filter((mc) => agentSiteIds.includes(mc.site_id));
   const rondesFiltrees = rondes.filter((r) => agentSiteIds.includes(r.site_id));
@@ -359,6 +374,7 @@ export default function EspaceAgent() {
     const now = format(new Date(), 'HH:mm');
     ptiMissedRef.current = false;
     resetTimer();
+    cancelFall();
     await mcCreateMut.mutateAsync({
       company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
       client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
@@ -367,11 +383,6 @@ export default function EspaceAgent() {
       latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
     });
     toast.success('Présence confirmée');
-  };
-
-  const handlePtiAlerte = async () => {
-    await triggerPtiAlerte(`⚠️ ALERTE PTI manuelle à ${format(new Date(), 'HH:mm')}`);
-    toast.error('Alerte PTI envoyée');
   };
 
   const startRonde = async (ronde) => {
@@ -614,34 +625,22 @@ export default function EspaceAgent() {
 
         <TabsContent value="pti">
           {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
-            <Card className={`p-8 text-center border-2 ${overdue ? 'border-red-500 bg-red-50' : 'border-border'}`}>
-              <Shield className={`w-16 h-16 mx-auto mb-4 ${overdue ? 'text-red-600' : 'text-muted-foreground'}`} />
-              <h2 className="text-xl font-bold mb-2">DATI / PTI</h2>
-              <p className="text-xs text-muted-foreground mb-2">Dispositif d’alarme pour travailleur isolé</p>
-              <p className="text-muted-foreground mb-4 text-sm">
-                Confirmez votre présence toutes les {intervalMinutes} minutes
-              </p>
-              {!currentService ? (
-                <p className="text-amber-600 font-medium p-3 bg-amber-50 rounded-xl">Prenez votre service pour activer le PTI</p>
-              ) : (
-                <>
-                  <div className={`text-5xl font-mono font-bold mb-2 ${overdue ? 'text-red-600 animate-pulse' : secondsLeft <= 60 ? 'text-amber-600' : 'text-primary'}`}>
-                    {timeLabel}
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-6">
-                    {overdue ? 'Délai dépassé — alerte envoyée' : 'Temps restant avant confirmation obligatoire'}
-                  </p>
-                  <div className="flex gap-4 justify-center flex-wrap">
-                    <Button size="lg" className="gap-2 bg-green-600 hover:bg-green-700 min-w-36" onClick={handlePtiCheck}>
-                      <CheckCircle2 className="w-5 h-5" /> Je suis OK
-                    </Button>
-                    <Button size="lg" variant="destructive" className="gap-2 min-w-36" onClick={handlePtiAlerte}>
-                      <AlertTriangle className="w-5 h-5" /> ALERTE PTI
-                    </Button>
-                  </div>
-                </>
-              )}
-            </Card>
+            <PtiModernScreen
+              active={!!currentService}
+              timeLabel={timeLabel}
+              secondsLeft={secondsLeft}
+              intervalMinutes={intervalMinutes}
+              overdue={overdue}
+              siteName={currentService?.site_name}
+              gpsOk={!!position}
+              fallArmed={fallArmed}
+              fallPending={fallPending}
+              fallCancelLeft={fallCancelLeft}
+              onOk={handlePtiCheck}
+              onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
+              onCancelFall={cancelFall}
+              onArmSensors={requestArm}
+            />
           )}
         </TabsContent>
 
@@ -974,6 +973,28 @@ export default function EspaceAgent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PtiCheckOverlay
+        open={!!currentService && droits.acces_pti && !showPriseForm && !showFinService && (secondsLeft <= 60 || overdue || fallPending)}
+        timeLabel={timeLabel}
+        overdue={overdue}
+        fallPending={fallPending}
+        fallCancelLeft={fallCancelLeft}
+        onOk={handlePtiCheck}
+        onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
+        onCancelFall={cancelFall}
+      />
+
+      {currentService && droits.acces_pti && activeTab !== 'pti' && !showPriseForm && !showFinService && (
+        <button
+          type="button"
+          onClick={() => setActiveTab('pti')}
+          className={`fixed right-3 z-[40] rounded-full shadow-xl px-4 h-12 text-sm font-semibold text-white flex items-center gap-2 ${overdue || secondsLeft <= 60 ? 'bg-red-600 animate-pulse' : 'bg-slate-900'}`}
+          style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
+          <Shield className="w-4 h-4" /> PTI {timeLabel}
+        </button>
+      )}
 
       <Dialog open={showPriseForm && !!selectedMission} onOpenChange={() => { setShowPriseForm(false); setSelectedMission(null); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">

@@ -245,7 +245,7 @@ export default function PlanningAvance() {
       />
 
       {view === 'carte' && (
-        <div className="absolute top-3 left-3 right-3 z-[500] flex items-center justify-between gap-2 pointer-events-none">
+        <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
           <div className="pointer-events-auto flex rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border border-white/70 p-0.5">
             <button type="button" onClick={() => setView('carte')} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium bg-slate-900 text-white">
               <MapPin className="w-4 h-4" /> Carte

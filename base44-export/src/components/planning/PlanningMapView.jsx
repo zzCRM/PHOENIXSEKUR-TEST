@@ -141,10 +141,10 @@ export default function PlanningMapView({
     <div className={cn(
       'relative overflow-hidden bg-[#e8eef2]',
       immersive
-        ? 'h-[calc(100dvh-3.25rem)] xl:h-[calc(100dvh-5.5rem)] rounded-none xl:rounded-3xl xl:border xl:border-border'
+        ? 'h-[calc(100dvh-3.25rem)] xl:h-[calc(100dvh-5.5rem)] rounded-none xl:rounded-3xl xl:border xl:border-border z-0 isolate'
         : compact
-          ? 'h-[68dvh] min-h-[420px] rounded-none xl:rounded-3xl xl:border xl:border-border'
-          : 'h-[min(78dvh,720px)] rounded-3xl border border-border',
+          ? 'h-[68dvh] min-h-[420px] rounded-none xl:rounded-3xl xl:border xl:border-border z-0 isolate'
+          : 'h-[min(78dvh,720px)] rounded-3xl border border-border z-0 isolate',
     )}>
       <MapContainer
         center={focusPin ? [focusPin.lat, focusPin.lng] : FR_CENTER}
@@ -181,7 +181,7 @@ export default function PlanningMapView({
         ))}
       </MapContainer>
 
-      <div className={cn('absolute left-3 right-3 z-[400] pointer-events-none', immersive ? 'top-[4.25rem]' : 'top-3')}>
+      <div className={cn('absolute left-3 right-3 z-10 pointer-events-none', immersive ? 'top-[4.25rem]' : 'top-3')}>
         <div className="pointer-events-auto rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border border-white/70 px-3 py-2">
           <p className="text-[11px] font-medium text-muted-foreground capitalize">
             {format(day, 'EEEE d MMMM yyyy', { locale: fr })}
@@ -211,7 +211,7 @@ export default function PlanningMapView({
         </div>
       </div>
 
-      <div className="absolute bottom-0 inset-x-0 z-[400] bg-gradient-to-t from-black/25 to-transparent pt-10 pb-3">
+      <div className="absolute bottom-0 inset-x-0 z-10 bg-gradient-to-t from-black/25 to-transparent pt-10 pb-3">
         <div ref={scrollerRef} className="flex gap-2.5 overflow-x-auto tabs-scroll px-3 snap-x snap-mandatory">
           {list.length === 0 ? (
             <div className="mx-auto mb-1 rounded-2xl bg-white/95 px-4 py-3 text-sm text-muted-foreground shadow">

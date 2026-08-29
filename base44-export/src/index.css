@@ -149,7 +149,16 @@ html, body, #root {
 .leaflet-container {
   font-family: inherit;
   background: #e8eef2;
+  z-index: 0 !important;
 }
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control {
+  z-index: 0 !important;
+}
+.leaflet-marker-pane { z-index: 2 !important; }
+.leaflet-overlay-pane { z-index: 1 !important; }
 .carte-pin {
   background: none !important;
   border: none !important;

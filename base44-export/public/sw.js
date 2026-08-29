@@ -1,5 +1,5 @@
 /* Service worker minimal — cache shell pour usage terrain */
-const CACHE = 'phoenix-sekur-v11';
+const CACHE = 'phoenix-sekur-v12';
 const ASSETS = [
   '/',
   '/login',
