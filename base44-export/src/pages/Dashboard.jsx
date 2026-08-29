@@ -12,6 +12,9 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
+import { accountDisplayName } from '@/lib/agentPortal';
+import PlanningMapView from '@/components/planning/PlanningMapView';
+import { useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer
@@ -88,13 +91,17 @@ function TopStatCard({ icon: Icon, value, label, to, color = "bg-[#6C757D]" }) {
 }
 
 export default function Dashboard() {
-  const { companyId, isAdmin } = useCompany();
+  const { companyId, isAdmin, user } = useCompany();
+  const navigate = useNavigate();
+  const [planDay, setPlanDay] = useState(() => new Date());
   const [searchServices, setSearchServices] = useState("");
   const [searchMissions, setSearchMissions] = useState("");
 
   const { data: agents = [], isLoading: la } = useQuery({ queryKey: ['agents', companyId], queryFn: () => base44.entities.Agent.filter({ company_id: companyId }) });
   const { data: clients = [], isLoading: lc } = useQuery({ queryKey: ['clients', companyId], queryFn: () => base44.entities.Client.filter({ company_id: companyId }) });
-  const { data: missions = [], isLoading: lm } = useQuery({ queryKey: ['missions', companyId], queryFn: () => base44.entities.Mission.filter({ company_id: companyId }, '-date', 50) });
+  const { data: missions = [], isLoading: lm } = useQuery({ queryKey: ['missions', companyId], queryFn: () => base44.entities.Mission.filter({ company_id: companyId }, '-date', 800) });
+  const { data: sites = [] } = useQuery({ queryKey: ['sites', companyId], queryFn: () => base44.entities.Site.filter({ company_id: companyId }), enabled: !!companyId });
+  const { data: prises = [] } = useQuery({ queryKey: ['prises_service', companyId], queryFn: () => base44.entities.PriseDeService.filter({ company_id: companyId }, '-date', 200), enabled: !!companyId });
   const { data: invoices = [], isLoading: li } = useQuery({ queryKey: ['invoices', companyId], queryFn: () => base44.entities.Invoice.filter({ company_id: companyId }) });
   const { data: leads = [], isLoading: ll } = useQuery({ queryKey: ['leads', companyId], queryFn: () => base44.entities.Lead.filter({ company_id: companyId }) });
 
@@ -175,8 +182,22 @@ export default function Dashboard() {
     <div className="space-y-6 relative">
       {/* Titre */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tableau de bord</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Vue d'ensemble de votre activité — cliquez sur chaque bloc pour accéder au détail</p>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          Bonjour {accountDisplayName(user) || user?.email || 'la société'}
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">Tableau de bord — carte des vacations</p>
+      </div>
+
+      <div className="-mx-3 sm:-mx-4 xl:mx-0">
+        <PlanningMapView
+          missions={missions}
+          prises={prises}
+          sites={sites}
+          selected={planDay}
+          onSelectDay={setPlanDay}
+          onOpenMission={() => navigate('/planning')}
+          compact
+        />
       </div>
 
       {/* 3 cartes statistiques du haut — reliées aux pages */}

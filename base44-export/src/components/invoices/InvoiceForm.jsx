@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,12 +7,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2 } from 'lucide-react';
 
+const EMPTY_INVOICE = {
+  invoice_number: '', client_id: '', client_name: '', date: '',
+  due_date: '', items: [{ description: '', quantity: 1, unit_price: 0, total: 0 }],
+  tva_rate: 20, status: 'brouillon', notes: '',
+};
+
 export default function InvoiceForm({ open, onClose, onSubmit, invoice, clients = [] }) {
-  const [form, setForm] = useState(invoice || {
-    invoice_number: '', client_id: '', client_name: '', date: '',
-    due_date: '', items: [{ description: '', quantity: 1, unit_price: 0, total: 0 }],
-    tva_rate: 20, status: 'brouillon', notes: ''
-  });
+  const [form, setForm] = useState(invoice || { ...EMPTY_INVOICE });
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(invoice
+      ? { ...EMPTY_INVOICE, ...invoice, items: invoice.items?.length ? invoice.items : EMPTY_INVOICE.items }
+      : { ...EMPTY_INVOICE, items: [{ description: '', quantity: 1, unit_price: 0, total: 0 }] });
+  }, [invoice, open]);
 
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 

@@ -1,0 +1,43 @@
+# Configure SMTP sur le VPS OVH — sans Termius
+# Déclenché manuellement ou après ajout du secret SMTP_PASS
+
+name: Configure SMTP (OVH)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SMTP on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SMTP_HOST: smtp.ionos.fr
+          SMTP_PORT: "587"
+          SMTP_USER: contact@phoenixsekur.com
+          SMTP_FROM: Phoenix Sekur <contact@phoenixsekur.com>
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 10m
+          envs: SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_FROM,SMTP_PASS
+          script: |
+            set -e
+            if [ -z "$SMTP_PASS" ]; then
+              echo "❌ Secret GitHub SMTP_PASS manquant."
+              echo "   Ajoutez-le dans Settings → Secrets → Actions du repo."
+              exit 1
+            fi
+            sudo git config --global --add safe.directory /opt/phoenixsekur
+            cd /opt/phoenixsekur
+            sudo git fetch origin
+            sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
+            sudo git pull
+            sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
+              SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" \
+              bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production
+            sudo bash scripts/deploy-ovh.sh
+            echo "✅ SMTP configuré + redéployé $(date)"

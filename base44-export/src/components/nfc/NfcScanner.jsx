@@ -59,8 +59,9 @@ export default function NfcScanner({ value = '', onChange, autoStart = false, co
             </div>
             <p className="text-sm font-semibold text-slate-700 mb-1">Prêt à scanner</p>
             <p className="text-xs text-muted-foreground mb-4">Approchez un badge NFC du dos du téléphone</p>
-            <Button type="button" onClick={launchScan} className="gap-2">
-              <ScanLine className="w-4 h-4" /> Scanner un badge NFC
+            <Button type="button" onClick={launchScan} className="gap-2 w-full max-w-xs whitespace-normal h-auto py-2.5 px-3">
+              <ScanLine className="w-4 h-4 shrink-0" />
+              <span className="text-sm">Scanner un badge NFC</span>
             </Button>
           </>
         )}

@@ -2,18 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Download, Search } from 'lucide-react';
-import jsPDF from 'jspdf';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { drawEntityHeader, drawLegalFooter } from '@/lib/pdfClientHeader';
+import { exportMainCourantePdf } from '@/lib/mainCourantePdf';
 import { useCompany } from '@/lib/useCompany';
 import EventTypeFilter from '@/components/main-courante/EventTypeFilter';
 import MainCouranteTable from '@/components/main-courante/MainCouranteTable';
 import MainCouranteFormDialog from '@/components/main-courante/MainCouranteFormDialog';
-import { normalizeEntry, synthesizeAutoEvents, getEventMeta, getCategory } from '@/lib/mainCouranteEvents';
+import { normalizeEntry, synthesizeAutoEvents } from '@/lib/mainCouranteEvents';
 
 export default function MainCourantePage() {
   const { companyId } = useCompany();
@@ -79,37 +76,18 @@ export default function MainCourantePage() {
   }, [merged, selectedSites, dateRange, selectedCodes, search]);
 
   const exportPDF = async () => {
-    const doc = new jsPDF();
-    const pageW = doc.internal.pageSize.getWidth();
     let firstClient = null;
     if (filtered[0]?.client_id) {
-      try { firstClient = await base44.entities.Client.get(filtered[0].client_id); } catch {}
+      try { firstClient = await base44.entities.Client.get(filtered[0].client_id); } catch { /* ignore */ }
     }
-    const headerBottom = await drawEntityHeader(doc, firstClient, { x: 14, y: 14, pageW, maxLogoH: 14 });
-    const titleY = headerBottom + 2;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
-    doc.text('Main courante', 14, titleY);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    doc.text(`Période : ${dateRange.start || '—'} → ${dateRange.end || '—'} — Sites : ${selectedSites.size === 0 ? 'Tous' : sites.filter(s => selectedSites.has(s.id)).map(s => s.name).join(', ')}`, 14, titleY + 6);
-    doc.text(`Exporté le : ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr })}`, 14, titleY + 12);
-
-    let y = titleY + 18;
-    filtered.forEach((entry, i) => {
-      if (y > 265) { doc.addPage(); y = 20; }
-      const cat = getCategory(entry.category);
-      doc.setFontSize(9); doc.setFont(undefined, 'bold');
-      doc.text(`${entry.date || ''} ${entry.time || ''} — [${entry.event_label}] ${entry.site_name || ''}`, 14, y);
-      doc.setFont(undefined, 'normal');
-      const lines = doc.splitTextToSize(entry.content || '', 180);
-      lines.forEach(line => { if (y > 265) { doc.addPage(); y = 20; } y += 5; doc.text(line, 14, y); });
-      if (entry.agent_name) { y += 5; doc.setTextColor(120); doc.text(`Agent : ${entry.agent_name}`, 14, y); doc.setTextColor(0); }
-      y += 8;
-      if (i < filtered.length - 1) { doc.setDrawColor(220); doc.line(14, y - 2, 196, y - 2); }
+    await exportMainCourantePdf({
+      entries: filtered,
+      companyId,
+      title: 'Main courante',
+      subtitle: `Période : ${dateRange.start || '—'} → ${dateRange.end || '—'} — Sites : ${selectedSites.size === 0 ? 'Tous' : sites.filter((s) => selectedSites.has(s.id)).map((s) => s.name).join(', ')}`,
+      filename: 'main-courante-export.pdf',
+      client: firstClient,
     });
-
-    const s = await base44.entities.CompanySettings.filter({ company_id: companyId });
-    drawLegalFooter(doc, s[0], { pageW, pageH: doc.internal.pageSize.getHeight() });
-    doc.save(`main-courante-export.pdf`);
   };
 
   return (

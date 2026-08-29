@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Paperclip, AlertTriangle, MapPin, Plus, Trash2, Info, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import NfcScanner from '@/components/nfc/NfcScanner';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -167,12 +168,47 @@ export default function InstructionsTab({ form, update }) {
         </div>
         <div className="rounded-lg bg-sky-100 text-sky-900 text-xs p-3 mb-4 flex gap-2">
           <Info className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>L'option pointage impose au collaborateur de badger un point de contrôle NFC pour assurer sa prise ou sa fin de service. L'intérêt du pointage est d'imposer une prise/fin de service à un endroit précis du site.</span>
+          <span>Choisissez le mode de pointage. NFC : l’agent doit badger le tag de prise / fin de service. Géolocalisation : l’agent doit être dans le rayon défini dans l’onglet Terrain.</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {[
+            { key: 'nfc', label: 'Prise / fin via NFC' },
+            { key: 'geolocalisation', label: 'Prise / fin via géolocalisation' },
+          ].map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => {
+                update('prise_service_mode', opt.key);
+                if (opt.key === 'nfc') {
+                  update('pointage_arrivee', true);
+                  update('pointage_depart', true);
+                }
+              }}
+              className={`text-sm rounded-lg border px-3 py-2 text-left ${form.prise_service_mode === opt.key ? 'border-primary bg-primary/5 font-medium' : 'border-border'}`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
         <div className="grid grid-cols-2 gap-4 mb-4">
-          <ToggleRow label="Pointage à l'arrivée sur site" checked={form.pointage_arrivee ?? false} onChange={v => update('pointage_arrivee', v)} />
-          <ToggleRow label="Pointage au départ du site" checked={form.pointage_depart ?? false} onChange={v => update('pointage_depart', v)} />
+          <ToggleRow label="Pointage NFC à l'arrivée" checked={form.pointage_arrivee ?? false} onChange={v => update('pointage_arrivee', v)} />
+          <ToggleRow label="Pointage NFC au départ" checked={form.pointage_depart ?? false} onChange={v => update('pointage_depart', v)} />
         </div>
+        {(form.prise_service_mode === 'nfc' || form.pointage_arrivee || form.pointage_depart) && (
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div className="space-y-2 rounded-xl border p-3">
+              <Label className="text-xs">NFC prise de service *</Label>
+              <Input value={form.nfc_tag_id || ''} onChange={(e) => update('nfc_tag_id', e.target.value)} placeholder="ID tag arrivée" className="font-mono text-xs" />
+              <NfcScanner value={form.nfc_tag_id || ''} onChange={(id) => update('nfc_tag_id', id)} compact />
+            </div>
+            <div className="space-y-2 rounded-xl border p-3">
+              <Label className="text-xs">NFC fin de service *</Label>
+              <Input value={form.nfc_tag_fin_id || ''} onChange={(e) => update('nfc_tag_fin_id', e.target.value)} placeholder="ID tag départ" className="font-mono text-xs" />
+              <NfcScanner value={form.nfc_tag_fin_id || ''} onChange={(id) => update('nfc_tag_fin_id', id)} compact />
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mb-3">
           <Input value={newCheckpoint} onChange={e => setNewCheckpoint(e.target.value)}

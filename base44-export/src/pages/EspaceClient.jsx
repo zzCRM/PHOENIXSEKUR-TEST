@@ -15,6 +15,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay 
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { toast } from 'sonner';
+import { exportMainCourantePdf } from '@/lib/mainCourantePdf';
 
 const TYPE_CONFIG = {
   arrivee: { label: 'Arrivée', color: 'text-green-600' },
@@ -24,6 +25,13 @@ const TYPE_CONFIG = {
   observation: { label: 'Observation', color: 'text-gray-600' },
   pti_alerte: { label: 'Alerte PTI', color: 'text-red-700' },
   pti_ok: { label: 'PTI OK', color: 'text-green-700' },
+  debut_pause: { label: 'Début de pause', color: 'text-amber-700' },
+  fin_pause: { label: 'Fin de pause', color: 'text-amber-700' },
+  debut_ronde: { label: 'Début de ronde', color: 'text-purple-600' },
+  fin_ronde: { label: 'Fin de ronde', color: 'text-purple-600' },
+  debut_service: { label: 'Début de service', color: 'text-green-600' },
+  debut_service_retard: { label: 'Début en retard', color: 'text-amber-700' },
+  fin_service: { label: 'Fin de service', color: 'text-blue-600' },
   autre: { label: 'Autre', color: 'text-gray-600' },
 };
 
@@ -195,9 +203,25 @@ export default function EspaceClient() {
         <TabsContent value="maincourante">
           {!canMainCourante ? <AccessDenied label="Main courante" /> : (
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
                 <h2 className="text-lg font-semibold">Historique main courante</h2>
-                <Badge variant="outline">{filteredMC.length} entrées</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{filteredMC.length} entrées</Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    disabled={filteredMC.length === 0}
+                    onClick={() => exportMainCourantePdf({
+                      entries: filteredMC.map((e) => ({ ...e, event_label: (TYPE_CONFIG[e.type] || TYPE_CONFIG.autre).label })),
+                      companyId,
+                      title: 'Main courante client',
+                      filename: 'main-courante-client.pdf',
+                    })}
+                  >
+                    <Download className="w-3.5 h-3.5" /> PDF
+                  </Button>
+                </div>
               </div>
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {filteredMC.length === 0 && (

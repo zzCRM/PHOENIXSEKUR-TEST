@@ -219,14 +219,14 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden" style={{ maxHeight: '92vh' }}>
-        <DialogHeader className="px-5 pt-4 pb-3 border-b shrink-0">
-          <DialogTitle className="text-base font-semibold">Ajout d'un point de contrôle</DialogTitle>
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-4xl p-0 gap-0 overflow-hidden flex flex-col max-h-[100dvh] sm:max-h-[92vh]">
+        <DialogHeader className="px-3 sm:px-5 pt-4 pb-3 border-b shrink-0">
+          <DialogTitle className="text-base font-semibold truncate pr-8">Ajout d&apos;un point de contrôle</DialogTitle>
         </DialogHeader>
 
         {/* Geo blocked warning */}
         {geoBlocked && (
-          <div className="mx-5 mt-3 bg-red-50 border border-red-300 rounded-lg px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+          <div className="mx-3 sm:mx-5 mt-3 bg-red-50 border border-red-300 rounded-lg px-4 py-3 text-sm text-red-700 flex items-start gap-2">
             <span className="text-lg">🚫</span>
             <div>
               <p className="font-semibold">Géolocalisation requise</p>
@@ -237,18 +237,35 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
 
         {/* Geo loading */}
         {geolocating && !geoBlocked && (
-          <div className="mx-5 mt-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-700 flex items-center gap-2">
+          <div className="mx-3 sm:mx-5 mt-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-700 flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin shrink-0" />
             Récupération de votre position GPS...
           </div>
         )}
 
-        <div className="flex overflow-hidden" style={{ height: 'calc(92vh - 115px)' }}>
-          {/* Left sidebar icons */}
-          <div className="w-12 border-r bg-muted/20 flex flex-col items-center py-4 gap-3 shrink-0">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Section tabs — horizontal on mobile, icon rail on desktop */}
+          <div className="md:hidden flex overflow-x-auto border-b bg-muted/20 shrink-0">
             {SECTIONS.map(s => (
               <button
                 key={s.key}
+                type="button"
+                onClick={() => setActiveSection(s.key)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  activeSection === s.key ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground'
+                }`}
+              >
+                <span className="text-sm">{s.icon}</span>
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="hidden md:flex w-12 border-r bg-muted/20 flex-col items-center py-4 gap-3 shrink-0">
+            {SECTIONS.map(s => (
+              <button
+                key={s.key}
+                type="button"
                 onClick={() => setActiveSection(s.key)}
                 title={s.label}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors ${
@@ -261,10 +278,10 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
           </div>
 
           {/* Form column */}
-          <div className="w-[48%] overflow-y-auto border-r shrink-0">
+          <div className="w-full md:w-[48%] overflow-y-auto overscroll-contain md:border-r shrink-0 min-w-0 order-1 md:order-none">
 
             {/* SITE */}
-            <div className={activeSection === 'site' ? 'px-5 py-4' : 'hidden'}>
+            <div className={activeSection === 'site' ? 'px-3 sm:px-5 py-4' : 'hidden'}>
               <h3 className="text-sm font-semibold mb-4">Site</h3>
               <div className="space-y-3">
                 <div>
@@ -294,7 +311,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
             </div>
 
             {/* NFC */}
-            <div className={activeSection === 'nfc' ? 'px-5 py-4' : 'hidden'}>
+            <div className={activeSection === 'nfc' ? 'px-3 sm:px-5 py-4' : 'hidden'}>
               <h3 className="text-sm font-semibold mb-4">NFC</h3>
 
               {/* Scanner NFC de qualité — animation + feedback + saisie manuelle */}
@@ -319,7 +336,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
               />
 
               {/* Lat / Lng — auto-filled after NFC scan */}
-              <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                 <Input
                   value={form.latitude ?? ''}
                   onChange={e => set('latitude', parseFloat(e.target.value) || null)}
@@ -362,7 +379,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
             </div>
 
             {/* DESCRIPTION */}
-            <div className={activeSection === 'description' ? 'px-5 py-4' : 'hidden'}>
+            <div className={activeSection === 'description' ? 'px-3 sm:px-5 py-4' : 'hidden'}>
               <h3 className="text-sm font-semibold mb-4">Description</h3>
               <div className="space-y-3">
                 <Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Titre" />
@@ -374,7 +391,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
                   <span>Pièces jointes</span>
                   <Paperclip className="w-4 h-4" />
                 </button>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Input value={form.batiment || ''} onChange={e => set('batiment', e.target.value)} placeholder="Batiment" />
                   <Input value={form.etage || ''} onChange={e => set('etage', e.target.value)} placeholder="Étage" />
                   <Input value={form.numero_clef || ''} onChange={e => set('numero_clef', e.target.value)} placeholder="Numéro de clef" />
@@ -383,7 +400,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
             </div>
 
             {/* ATTRIBUTS */}
-            <div className={activeSection === 'attributs' ? 'px-5 py-4' : 'hidden'}>
+            <div className={activeSection === 'attributs' ? 'px-3 sm:px-5 py-4' : 'hidden'}>
               <h3 className="text-sm font-semibold mb-4">Attributs</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -408,7 +425,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
             </div>
 
             {/* PHOTO */}
-            <div className={activeSection === 'photo' ? 'px-5 py-4' : 'hidden'}>
+            <div className={activeSection === 'photo' ? 'px-3 sm:px-5 py-4' : 'hidden'}>
               <h3 className="text-sm font-semibold mb-4">Prendre une photo</h3>
               <input type="file" accept="image/*" ref={fileRef} onChange={handlePhotoUpload} className="hidden" />
               {form.photo_url ? (
@@ -432,7 +449,7 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
           </div>
 
           {/* Google Maps column */}
-          <div className="flex-1 relative overflow-hidden">
+          <div className="w-full md:flex-1 relative overflow-hidden min-h-[220px] h-[240px] md:h-auto border-t md:border-t-0 order-2 md:order-none">
             <GoogleMapPicker
               lat={form.latitude}
               lng={form.longitude}
@@ -442,9 +459,9 @@ export default function CheckpointFormDialog({ open, onClose, onSave, checkpoint
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 border-t bg-muted/20 flex justify-end gap-3 shrink-0">
-          <Button variant="outline" onClick={onClose}>Annuler</Button>
-          <Button onClick={() => canSave && onSave(form)} disabled={!canSave} className="px-8">
+        <div className="px-3 sm:px-5 py-3 border-t bg-muted/20 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 shrink-0">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
+          <Button onClick={() => canSave && onSave(form)} disabled={!canSave} className="w-full sm:w-auto sm:px-8">
             ENREGISTRER
           </Button>
         </div>

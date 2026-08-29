@@ -2,12 +2,8 @@ import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 
 /**
- * companyId = identifiant unique de la société.
- * - Si l'utilisateur est ADMIN : son user.id est le company_id (il EST le propriétaire de la société).
- * - Si l'utilisateur est non-admin (agent, client) : son company_id est stocké
- *   dans le champ `company_id` de son profil (renseigné lors de l'onboarding).
- *
- * Cela garantit l'isolation totale des données entre sociétés distinctes.
+ * companyId = identifiant société (User.companyId en base).
+ * Isolation multi-tenant : jamais utiliser user.id à la place.
  */
 export function useCompany() {
   const [user, setUser] = useState(null);
@@ -21,11 +17,9 @@ export function useCompany() {
       if (cancelled) return;
       if (u) {
         setUser(u);
-        // Admin = propriétaire de la société, son ID est le company_id
-        // Agent/Client non-admin = company_id stocké sur son profil
-        const cid = u.role === 'admin' ? u.id : (u.company_id || u.id);
+        const cid = u.company_id || u.companyId || null;
         setCompanyId(cid);
-        setIsAdmin(u.role === 'admin');
+        setIsAdmin(u.role === 'admin' || u.role === 'superadmin' || !!u.superadmin);
       }
       setLoading(false);
     }).catch(() => {

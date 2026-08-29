@@ -282,6 +282,46 @@ export const synthesizeAutoEvents = ({ prises = [], rondeExecs = [] }) => {
       }
       events.push({ ...base, category: 'service', event_type: key, event_label: getEventMeta('service', key).label, time: p.actual_end, content, code: eventTypeCode('service', key), severity: getEventMeta('service', key).severity, id: `auto-ps-end-${p.id}`, latitude: p.end_latitude, longitude: p.end_longitude });
     }
+
+    (p.pauses || []).forEach((pause, i) => {
+      events.push({
+        ...base,
+        category: 'pause',
+        event_type: 'debut_pause',
+        event_label: 'Début de pause',
+        time: pause.start,
+        content: `Début de pause à ${pause.start}`,
+        code: eventTypeCode('pause', 'debut_pause'),
+        severity: 'normal',
+        id: `auto-pause-start-${p.id}-${i}`,
+      });
+      if (pause.end) {
+        events.push({
+          ...base,
+          category: 'pause',
+          event_type: 'fin_pause',
+          event_label: 'Fin de pause',
+          time: pause.end,
+          content: `Fin de pause à ${pause.end} — ${pause.minutes || 0} min`,
+          code: eventTypeCode('pause', 'fin_pause'),
+          severity: 'normal',
+          id: `auto-pause-end-${p.id}-${i}`,
+        });
+      }
+    });
+    if (p.pause_started_time && !p.actual_end) {
+      events.push({
+        ...base,
+        category: 'pause',
+        event_type: 'debut_pause',
+        event_label: 'Début de pause',
+        time: p.pause_started_time,
+        content: `Pause en cours depuis ${p.pause_started_time}`,
+        code: eventTypeCode('pause', 'debut_pause'),
+        severity: 'normal',
+        id: `auto-pause-open-${p.id}`,
+      });
+    }
   });
 
   // Depuis les rondes réalisées

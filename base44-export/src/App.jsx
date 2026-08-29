@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import RoleHomeRedirect from '@/components/RoleHomeRedirect';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import AppLayout from '@/components/layout/AppLayout';
@@ -34,8 +35,12 @@ import GestionRH from '@/pages/GestionRH';
 import EcartsHoraires from '@/pages/EcartsHoraires';
 import PointsControle from '@/pages/PointsControle';
 import HeuresCollaborateurs from '@/pages/HeuresCollaborateurs';
+import Prepaie from '@/pages/Prepaie';
 import RapportsPDF from '@/pages/RapportsPDF';
 import Leads from '@/pages/Leads';
+import Login from '@/pages/Login';
+import AcceptInvitation from '@/pages/AcceptInvitation';
+import SuperAdmin from '@/pages/SuperAdmin';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -57,7 +62,9 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
+    <>
+      <RoleHomeRedirect />
+      <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/planning" element={<PlanningAvance />} />
@@ -86,11 +93,14 @@ const AuthenticatedApp = () => {
         <Route path="/ecarts-horaires" element={<EcartsHoraires />} />
         <Route path="/points-controle" element={<PointsControle />} />
         <Route path="/heures-collaborateurs" element={<HeuresCollaborateurs />} />
+        <Route path="/prepaie" element={<Prepaie />} />
         <Route path="/rapports-pdf" element={<RapportsPDF />} />
         <Route path="/leads" element={<Leads />} />
+        <Route path="/super-admin" element={<SuperAdmin />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </>
   );
 };
 
@@ -99,7 +109,11 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
-          <AuthenticatedApp />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/invitation/:token" element={<AcceptInvitation />} />
+            <Route path="/*" element={<AuthenticatedApp />} />
+          </Routes>
         </Router>
         <Toaster />
       </QueryClientProvider>

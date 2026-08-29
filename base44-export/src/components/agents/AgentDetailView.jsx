@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X, User, Briefcase, MapPin, Image as ImageIcon, Shield,
-  Star, AlertTriangle, FileText, Package, Euro, Clock, CheckCircle2, Mail
+  Star, AlertTriangle, FileText, Package, Euro, Clock, CheckCircle2
 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { DROITS_AGENT_OPTIONS, mergeAgentDroits } from '@/lib/agentPortal';
 
 const SECTIONS = [
   { id: 'general', label: 'Général' },
@@ -27,16 +29,7 @@ const SECTIONS = [
   { id: 'salaire', label: 'Éléments de salaire' },
 ];
 
-const ACCES_OPTIONS = [
-  { key: 'acces_espace_agent', label: 'Espace Agent', description: 'Accès à l\'espace agent mobile' },
-  { key: 'acces_planning', label: 'Planning', description: 'Consulter son planning de missions' },
-  { key: 'acces_conges', label: 'Congés & Absences', description: 'Faire des demandes de congé' },
-  { key: 'acces_documents', label: 'Documents', description: 'Consulter les documents partagés' },
-  { key: 'acces_fiches_paie', label: 'Fiches de paie', description: 'Télécharger ses fiches de paie' },
-  { key: 'acces_rondes', label: 'Rondes', description: 'Effectuer les rondes de surveillance' },
-  { key: 'acces_pti', label: 'PTI', description: 'Accès au module Protection Travailleur Isolé' },
-  { key: 'acces_main_courante', label: 'Main courante', description: 'Consulter la main courante' },
-];
+const ACCES_OPTIONS = DROITS_AGENT_OPTIONS;
 
 function StarRating({ value, onChange }) {
   return (
@@ -54,21 +47,28 @@ export default function AgentDetailView({ agent, onClose }) {
   const [activeSection, setActiveSection] = useState('general');
   const [formData, setFormData] = useState({ ...agent });
   const [photoFile, setPhotoFile] = useState(null);
-  const [inviting, setInviting] = useState(false);
-  const [inviteSent, setInviteSent] = useState(false);
+  const [creerComptePhoenix, setCreerComptePhoenix] = useState(false);
   const qc = useQueryClient();
 
   const updateMut = useMutation({
     mutationFn: async (data) => {
+      const { creer_compte_phoenix, ...payload } = data;
       if (photoFile) {
         const { file_url } = await base44.integrations.Core.UploadFile({ file: photoFile });
-        data.photo_url = file_url;
+        payload.photo_url = file_url;
       }
-      return base44.entities.Agent.update(agent.id, data);
+      const updated = await base44.entities.Agent.update(agent.id, payload);
+      let invite = null;
+      if (creer_compte_phoenix && payload.email) {
+        invite = await base44.users.inviteUser(payload.email, 'user');
+      }
+      return { updated, invite };
     },
-    onSuccess: () => {
+    onSuccess: ({ invite }) => {
       qc.invalidateQueries({ queryKey: ['agents'] });
-      toast.success('Fiche enregistrée');
+      if (invite?.email_sent) toast.success('Fiche enregistrée — invitation envoyée');
+      else if (invite?.invite_url) toast.warning('Fiche enregistrée — invitation créée, email non envoyé');
+      else toast.success('Fiche enregistrée');
       onClose();
     },
     onError: (err) => toast.error('Erreur : ' + err.message),
@@ -83,21 +83,6 @@ export default function AgentDetailView({ agent, onClose }) {
     const reader = new FileReader();
     reader.onload = (ev) => update('photo_url', ev.target.result);
     reader.readAsDataURL(file);
-  };
-
-  const handleInvite = async () => {
-    const email = formData.email;
-    if (!email) { toast.error('Ajoutez un email d\'abord'); return; }
-    setInviting(true);
-    try {
-      const appRole = (formData.role === 'admin' || formData.role === 'superviseur') ? 'admin' : 'user';
-      await base44.users.inviteUser(email, appRole);
-      setInviteSent(true);
-      toast.success(`Invitation envoyée à ${email}`);
-    } catch (err) {
-      toast.error('Erreur invitation : ' + err.message);
-    }
-    setInviting(false);
   };
 
   const renderSection = () => {
@@ -290,7 +275,6 @@ export default function AgentDetailView({ agent, onClose }) {
                     <SelectContent>
                       <SelectItem value="agent">Agent</SelectItem>
                       <SelectItem value="superviseur">Superviseur</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -354,14 +338,20 @@ export default function AgentDetailView({ agent, onClose }) {
 
               <div className="space-y-2">
                 {ACCES_OPTIONS.map(opt => (
-                  <div key={opt.key} className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/20">
+                  <div key={opt.key} className="flex items-start sm:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-muted/20">
                     <div>
                       <p className="text-sm font-medium">{opt.label}</p>
                       <p className="text-xs text-muted-foreground">{opt.description}</p>
                     </div>
                     <Switch
-                      checked={formData[opt.key] !== false}
-                      onCheckedChange={v => update(opt.key, v)}
+                      checked={mergeAgentDroits(formData)[opt.key] === true}
+                      onCheckedChange={(v) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          [opt.key]: v,
+                          droits_portail: { ...mergeAgentDroits(prev), [opt.key]: v },
+                        }));
+                      }}
                     />
                   </div>
                 ))}
@@ -369,22 +359,22 @@ export default function AgentDetailView({ agent, onClose }) {
             </div>
 
             <div className="border-t pt-4 space-y-3">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Invitation</h3>
-              <p className="text-xs text-muted-foreground">Envoie un email d'invitation à l'agent pour créer son mot de passe.</p>
-              <div className="p-3 rounded-xl bg-muted/30 text-sm">
-                Email : <strong>{formData.email || <span className="text-destructive">Non renseigné</span>}</strong>
-              </div>
-              {inviteSent ? (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <p className="text-sm font-medium">Invitation envoyée !</p>
+              <div className="flex items-start gap-3 rounded-xl border border-border p-4 bg-muted/20">
+                <Checkbox
+                  id="creer-compte-phoenix-detail"
+                  checked={creerComptePhoenix}
+                  onCheckedChange={(v) => setCreerComptePhoenix(!!v)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="creer-compte-phoenix-detail" className="text-sm font-semibold cursor-pointer">
+                    Créer un compte Phoenix Sekur
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    À l&apos;enregistrement, envoie une invitation à <strong>{formData.email || '— (email manquant)'}</strong> au nom de votre société.
+                  </p>
                 </div>
-              ) : (
-                <Button className="w-full gap-2" onClick={handleInvite} disabled={inviting || !formData.email}>
-                  <Mail className="w-4 h-4" />
-                  {inviting ? 'Envoi...' : 'Envoyer l\'invitation par email'}
-                </Button>
-              )}
+              </div>
             </div>
           </div>
         );
@@ -459,29 +449,51 @@ export default function AgentDetailView({ agent, onClose }) {
 
   return (
     <Dialog open={!!agent} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-4xl max-h-[100dvh] sm:max-h-[92vh] p-0 overflow-hidden flex flex-col gap-0">
         {/* Header */}
-        <div className="bg-primary text-primary-foreground px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">Fiche collaborateur — {formData.last_name} {formData.first_name}</span>
+        <div className="bg-primary text-primary-foreground px-3 sm:px-6 py-3 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-sm truncate">
+              Fiche collaborateur — {formData.last_name} {formData.first_name}
+            </span>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="text-primary-foreground hover:bg-white/20 h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={onClose} className="text-primary-foreground hover:bg-white/20 h-8 w-8 shrink-0">
             <X className="w-4 h-4" />
           </Button>
         </div>
 
-        <div className="flex h-[calc(92vh-90px)]">
-          {/* Sidebar */}
-          <div className="w-56 shrink-0 border-r border-border bg-muted/20 overflow-y-auto">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+          {/* Tabs mobiles — scroll horizontal */}
+          <div className="md:hidden flex overflow-x-auto border-b border-border bg-muted/30 shrink-0 scrollbar-none">
             {SECTIONS.map(s => (
               <button
                 key={s.id}
+                type="button"
+                onClick={() => setActiveSection(s.id)}
+                className={cn(
+                  'shrink-0 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
+                  activeSection === s.id
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground',
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sidebar desktop */}
+          <div className="hidden md:block w-56 shrink-0 border-r border-border bg-muted/20 overflow-y-auto">
+            {SECTIONS.map(s => (
+              <button
+                key={s.id}
+                type="button"
                 onClick={() => setActiveSection(s.id)}
                 className={cn(
                   'w-full text-left px-4 py-3 text-sm border-b border-border/50 transition-colors',
                   activeSection === s.id
                     ? 'bg-primary/10 text-primary font-semibold border-l-4 border-l-primary'
-                    : 'hover:bg-muted/50 text-foreground'
+                    : 'hover:bg-muted/50 text-foreground',
                 )}
               >
                 {s.label}
@@ -490,14 +502,30 @@ export default function AgentDetailView({ agent, onClose }) {
           </div>
 
           {/* Content */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-3 sm:p-6">
               {renderSection()}
             </div>
-            <div className="border-t border-border p-4 flex gap-3 justify-end bg-background">
-              <Button variant="outline" onClick={onClose}>Annuler</Button>
-              <Button onClick={() => updateMut.mutate(formData)} disabled={updateMut.isPending}>
-                {updateMut.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            <div className="border-t border-border p-3 sm:p-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end bg-background shrink-0">
+              <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
+              <Button
+                onClick={() => {
+                  if (creerComptePhoenix && !formData.email) {
+                    toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
+                    return;
+                  }
+                  const droits_portail = mergeAgentDroits(formData);
+                  updateMut.mutate({
+                    ...formData,
+                    ...droits_portail,
+                    droits_portail,
+                    creer_compte_phoenix: creerComptePhoenix,
+                  });
+                }}
+                disabled={updateMut.isPending}
+                className="w-full sm:w-auto"
+              >
+                {updateMut.isPending ? 'Enregistrement...' : 'Enregistrer'}
               </Button>
             </div>
           </div>

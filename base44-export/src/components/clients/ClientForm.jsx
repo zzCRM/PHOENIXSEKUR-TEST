@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, CheckCircle2, Mail, Info, Shield, Plus, Trash2, Users, Building2, MapPin, CreditCard, FileText, User } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { CheckCircle2, Info, Shield, Plus, Trash2, Users, Building2, MapPin, CreditCard, FileText, User } from 'lucide-react';
 import { toast } from 'sonner';
 import ClientPortalPermissions, { DEFAULT_PORTAL_PERMS } from '@/components/clients/ClientPortalPermissions';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
@@ -53,10 +54,7 @@ const PORTAL_NOTIFS = [
 export default function ClientForm({ open, onClose, onSubmit, client }) {
   const { companyId } = useCompany();
   const [tab, setTab] = useState('general');
-  const [inviteSent, setInviteSent] = useState(false);
-  const [inviting, setInviting] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [compteClients, setCompteClients] = useState([{ email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+  const [compteClients, setCompteClients] = useState([{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
   const [portalPerms, setPortalPerms] = useState({ ...DEFAULT_PORTAL_PERMS });
   const [portalDroits, setPortalDroits] = useState({});
   const [portalNotifs, setPortalNotifs] = useState({});
@@ -70,7 +68,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
   const clientSites = client ? sites.filter(s => s.client_id === client.id) : [];
 
   const [form, setForm] = useState({
-    company_name: '', contact_name: '', email: '', phone: '',
+    company_name: '', contact_name: '', email: '', phone: '', urgence_phone: '',
     address: '', city: '', postal_code: '', country: 'FRANCE',
     status: 'actif', notes: '',
     legal_form: '', siret: '', tva_number: '', siren: '', director_name: '',
@@ -81,20 +79,19 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
   useEffect(() => {
     if (client) {
       setForm({ country: 'FRANCE', ...client });
-      setInviteEmail(client.email || '');
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS, ...(client.portal_perms || {}) });
-      setCompteClients(client.comptes_clients?.length ? client.comptes_clients : [{ email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+      setCompteClients(client.comptes_clients?.length
+        ? client.comptes_clients
+        : [{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits(client.portal_droits || {});
       setPortalNotifs(client.portal_notifs || {});
     } else {
-      setForm({ company_name: '', contact_name: '', email: '', phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
-      setInviteEmail('');
+      setForm({ company_name: '', contact_name: '', email: '', phone: '', urgence_phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS });
-      setCompteClients([{ email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+      setCompteClients([{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits({});
       setPortalNotifs({});
     }
-    setInviteSent(false);
     setTab('general');
   }, [client, open]);
 
@@ -113,51 +110,56 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
 
   const handleSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    onSubmit({ ...form, portal_perms: portalPerms, comptes_clients: compteClients, portal_droits: portalDroits, portal_notifs: portalNotifs });
+    const needsAccount = compteClients.some((c) => c.has_account);
+    if (needsAccount) {
+      const emails = compteClients.filter((c) => c.has_account && c.email).map((c) => c.email);
+      if (emails.length === 0) {
+        toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
+        return;
+      }
+    }
+    onSubmit({
+      ...form,
+      portal_perms: portalPerms,
+      comptes_clients: compteClients,
+      portal_droits: portalDroits,
+      portal_notifs: portalNotifs,
+    });
   };
 
-  const addCompte = () => setCompteClients(prev => [...prev, { email: '', role: 'user', invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
+  const addCompte = () => setCompteClients(prev => [...prev, { email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
   const removeCompte = (i) => setCompteClients(prev => prev.filter((_, idx) => idx !== i));
   const updateCompte = (i, field, val) => setCompteClients(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
-  const inviteCompte = async (i) => {
-    const compte = compteClients[i];
-    if (!compte.email) { toast.error('Email requis'); return; }
-    try {
-      await base44.users.inviteUser(compte.email, compte.role || 'user');
-      updateCompte(i, 'invite_sent', true);
-      toast.success(`Invitation envoyée à ${compte.email}`);
-    } catch (err) {
-      toast.error("Erreur : " + (err.message || 'Erreur inconnue'));
-    }
-  };
-
-  const handleInvite = async () => {
-    const email = inviteEmail || form.email;
-    if (!email) { toast.error('Veuillez saisir un email'); return; }
-    setInviting(true);
-    try {
-      await base44.users.inviteUser(email, 'user');
-      setInviteSent(true);
-      toast.success(`Invitation envoyée à ${email}`);
-    } catch (err) {
-      toast.error("Erreur : " + (err.message || 'Erreur inconnue'));
-    }
-    setInviting(false);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="w-[calc(100vw-0.75rem)] max-w-3xl max-h-[100dvh] sm:max-h-[92vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="text-base">{client ? `Consultation d'un client — ${client.company_name}` : 'Nouveau client'}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          {/* Left sidebar tabs */}
-          <div className="w-44 shrink-0 border-r bg-muted/20 py-3 overflow-y-auto">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
+          {/* Tabs mobiles */}
+          <div className="md:hidden flex overflow-x-auto border-b bg-muted/20 shrink-0">
             {TABS.map(t => (
               <button
                 key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 ${tab === t.key ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground'}`}
+              >
+                <t.icon className="w-3.5 h-3.5" />
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Left sidebar tabs desktop */}
+          <div className="hidden md:block w-44 shrink-0 border-r bg-muted/20 py-3 overflow-y-auto">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                type="button"
                 onClick={() => setTab(t.key)}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${tab === t.key ? 'bg-primary/10 text-primary font-medium border-r-2 border-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
               >
@@ -173,12 +175,12 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 py-4 sm:py-5 min-w-0">
 
             {/* GÉNÉRAL */}
             {tab === 'general' && (
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Société *</Label>
                     <Input value={form.company_name} onChange={e => update('company_name', e.target.value)} required />
@@ -192,12 +194,16 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                     <Input value={form.phone} onChange={e => update('phone', e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
+                    <Label>Numéro d’urgence</Label>
+                    <Input value={form.urgence_phone || ''} onChange={e => update('urgence_phone', e.target.value)} placeholder="Composé par l’agent en cas d’alerte PTI" />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>Email</Label>
-                    <Input type="email" value={form.email} onChange={e => { update('email', e.target.value); setInviteEmail(e.target.value); }} />
+                    <Input type="email" value={form.email} onChange={e => update('email', e.target.value)} />
                   </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
                   <div className="space-y-1.5">
                     <Label>Logo client</Label>
                     <div className="flex items-center gap-3">
@@ -217,7 +223,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Statut</Label>
                     <Select value={form.status} onValueChange={v => update('status', v)}>
@@ -237,7 +243,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
 
                 <div className="border-t pt-4">
                   <h3 className="font-semibold mb-3 text-sm flex items-center gap-2"><FileText className="w-4 h-4 text-muted-foreground" /> Informations légales</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-1.5">
                       <Label>Forme juridique</Label>
                       <Select value={form.legal_form || ''} onValueChange={v => update('legal_form', v)}>
@@ -335,12 +341,21 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                         </div>
                         <span className="font-semibold text-sm">Compte</span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={compte.has_account || false}
-                          onCheckedChange={v => updateCompte(i, 'has_account', v)}
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id={`creer-compte-client-${i}`}
+                          checked={!!compte.has_account}
+                          onCheckedChange={v => updateCompte(i, 'has_account', !!v)}
+                          className="mt-0.5"
                         />
-                        <Label className="text-sm">Compte client</Label>
+                        <div>
+                          <Label htmlFor={`creer-compte-client-${i}`} className="text-sm font-medium cursor-pointer">
+                            Créer un compte Phoenix Sekur
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Invitation automatique par email à l&apos;enregistrement (au nom de votre société).
+                          </p>
+                        </div>
                       </div>
                       {compte.has_account && (
                         <div className="space-y-3">
@@ -348,7 +363,6 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                             <Label className="text-xs text-muted-foreground mb-1.5 block">Compte Phoenix Sekur®</Label>
                             <div className="flex items-center gap-2 p-2 rounded-lg border bg-background text-sm text-muted-foreground">
                               <span>{compte.email || '—'}</span>
-                              {compte.email && <button className="ml-auto text-xs text-destructive">✕</button>}
                             </div>
                           </div>
                           <div>
@@ -399,16 +413,11 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                             </div>
                           </div>
 
-                          {/* Invitation */}
-                          {compte.invite_sent ? (
+                          {compte.invite_sent && (
                             <div className="flex items-center gap-2 text-green-600 text-xs">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Invitation envoyée à {compte.email}</span>
+                              <span>Invitation déjà envoyée à {compte.email}</span>
                             </div>
-                          ) : (
-                            <Button type="button" size="sm" variant="outline" className="gap-2 h-8" onClick={() => inviteCompte(i)} disabled={!compte.email}>
-                              <Mail className="w-3.5 h-3.5" /> Envoyer l'invitation
-                            </Button>
                           )}
                         </div>
                       )}
@@ -431,7 +440,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   <Label>Pays</Label>
                   <Input value={form.country || 'FRANCE'} onChange={e => update('country', e.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Code postal</Label>
                     <Input value={form.postal_code} onChange={e => update('postal_code', e.target.value)} />
@@ -470,7 +479,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
             {tab === 'facturation' && (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <h3 className="font-semibold text-sm flex items-center gap-2"><CreditCard className="w-4 h-4 text-muted-foreground" /> Facturation</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label>Délai de paiement (jours)</Label>
                     <Input type="number" value={form.payment_delay || ''} onChange={e => update('payment_delay', e.target.value)} placeholder="30" />
@@ -499,27 +508,12 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
             {tab === 'acces' && (
               <div className="space-y-5">
                 <ClientPortalPermissions perms={portalPerms} onChange={setPortalPerms} sites={clientSites} />
-                <div className="border-t pt-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <UserPlus className="w-4 h-4 text-primary" />
-                    <Label className="text-sm font-semibold">Envoyer l'invitation portail</Label>
-                  </div>
-                  <Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="contact@client.fr" />
-                  {inviteSent ? (
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-700">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <p className="text-sm font-medium">Invitation envoyée à {inviteEmail}</p>
-                    </div>
-                  ) : (
-                    <Button className="w-full gap-2" onClick={handleInvite} disabled={inviting || !inviteEmail}>
-                      <Mail className="w-4 h-4" />
-                      {inviting ? 'Envoi en cours...' : "Envoyer l'invitation"}
-                    </Button>
-                  )}
-                  <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
-                    <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <span>Le client recevra un lien pour créer son mot de passe et accéder aux modules autorisés.</span>
-                  </div>
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground border-t pt-4">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    Pour créer un compte Phoenix Sekur, cochez la case sur un contact dans l&apos;onglet Contacts.
+                    Le client recevra alors une invitation pour accéder aux modules autorisés ici.
+                  </span>
                 </div>
                 <div className="flex justify-end gap-3 pt-2 border-t">
                   <Button variant="outline" onClick={onClose}>Fermer</Button>

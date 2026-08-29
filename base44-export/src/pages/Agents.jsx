@@ -30,14 +30,42 @@ export default function Agents() {
   });
 
   const createMut = useMutation({
-    mutationFn: (data) => base44.entities.Agent.create({ ...data, company_id: companyId }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['agents', companyId] }); setShowForm(false); toast.success('Agent créé avec succès'); },
+    mutationFn: async (data) => {
+      const { creer_compte_phoenix, ...agentData } = data;
+      const created = await base44.entities.Agent.create({ ...agentData, company_id: companyId });
+      let invite = null;
+      if (creer_compte_phoenix && agentData.email) {
+        invite = await base44.users.inviteUser(agentData.email, 'user');
+      }
+      return { created, invite };
+    },
+    onSuccess: ({ invite }) => {
+      qc.invalidateQueries({ queryKey: ['agents', companyId] });
+      setShowForm(false);
+      if (invite?.email_sent) toast.success('Collaborateur créé — invitation envoyée par email');
+      else if (invite?.invite_url) toast.warning('Collaborateur créé — invitation créée, email non envoyé (copiez le lien depuis Utilisateurs)');
+      else if (invite?.already_registered) toast.success('Collaborateur créé — un compte existe déjà pour cet email');
+      else toast.success('Collaborateur créé avec succès');
+    },
     onError: (error) => { toast.error('Échec de la création : ' + (error.message || 'Erreur inconnue')); },
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Agent.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['agents', companyId] }); setEditAgent(null); toast.success('Agent modifié avec succès'); },
+    mutationFn: async ({ id, data }) => {
+      const { creer_compte_phoenix, ...agentData } = data;
+      const updated = await base44.entities.Agent.update(id, agentData);
+      let invite = null;
+      if (creer_compte_phoenix && agentData.email) {
+        invite = await base44.users.inviteUser(agentData.email, 'user');
+      }
+      return { updated, invite };
+    },
+    onSuccess: ({ invite }) => {
+      qc.invalidateQueries({ queryKey: ['agents', companyId] });
+      setEditAgent(null);
+      if (invite?.email_sent) toast.success('Fiche enregistrée — invitation envoyée');
+      else toast.success('Agent modifié avec succès');
+    },
     onError: (error) => { toast.error('Échec de la modification : ' + (error.message || 'Erreur inconnue')); },
   });
 

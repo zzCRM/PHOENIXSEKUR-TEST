@@ -1,0 +1,51 @@
+# Déploiement automatique OVH — comme Phoenix CRM sur Hetzner
+
+name: Deploy Phoenix Sekur (OVH)
+
+on:
+  push:
+    branches: [main, cursor/migrate-off-base44-6bc2]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          SMTP_HOST: smtp.ionos.fr
+          SMTP_PORT: "587"
+          SMTP_USER: contact@phoenixsekur.com
+          SMTP_FROM: Phoenix Sekur <contact@phoenixsekur.com>
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          VITRINE_DOMAIN: www.phoenixsekur.com
+          ROOT_DOMAIN: phoenixsekur.com
+          VITRINE_URL: https://www.phoenixsekur.com
+          COOKIE_DOMAIN: .phoenixsekur.com
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 20m
+          envs: SMTP_HOST,SMTP_PORT,SMTP_USER,SMTP_FROM,SMTP_PASS
+          script: |
+            set -e
+            sudo git config --global --add safe.directory /opt/phoenixsekur
+            cd /opt/phoenixsekur
+            sudo git fetch origin
+            sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
+            sudo git pull
+            if [ -n "$SMTP_PASS" ]; then
+              sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
+                SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" APP_URL="https://app.phoenixsekur.com" \
+                bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production
+            else
+              echo "⚠️ SMTP_PASS secret manquant — les invitations ne partiront pas par email"
+              sudo APP_URL="https://app.phoenixsekur.com" \
+                bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production || true
+            fi
+            sudo bash scripts/ensure-vitrine-env.sh /opt/phoenixsekur/.env.production || true
+            sudo bash scripts/ensure-superadmin-env.sh /opt/phoenixsekur/.env.production || true
+            sudo bash scripts/deploy-ovh.sh
+            echo "✅ Déployé $(date)"

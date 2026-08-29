@@ -1,0 +1,88 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: phoenixsekur-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: phoenix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: phoenixsekur
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phoenix -d phoenixsekur"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: phoenixsekur-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://phoenix:${POSTGRES_PASSWORD}@postgres:5432/phoenixsekur
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3001
+      CORS_ORIGIN: https://${DOMAIN}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_COMPANY_ID: ${ADMIN_COMPANY_ID:-69edb44339460eb505c2a699}
+      DOMAIN: ${DOMAIN}
+      APP_URL: ${APP_URL:-https://${DOMAIN}}
+      VITRINE_DOMAIN: ${VITRINE_DOMAIN:-www.phoenixsekur.com}
+      VITRINE_URL: ${VITRINE_URL:-https://${VITRINE_DOMAIN:-www.phoenixsekur.com}}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-.phoenixsekur.com}
+      COMPANY_ADMIN_EMAILS: ${COMPANY_ADMIN_EMAILS:-serviceclient@ppsecurity.fr,contact@ppsecurity.fr}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-${SMTP_PASSWORD:-}}
+      SMTP_PASSWORD: ${SMTP_PASS:-${SMTP_PASSWORD:-}}
+      SMTP_FROM: ${SMTP_FROM:-}
+    volumes:
+      - uploads_data:/app/uploads
+      - ./base44-export/data/exports:/imports:ro
+    entrypoint: ["./docker-entrypoint.sh"]
+
+  frontend:
+    build:
+      context: ./base44-export
+      dockerfile: Dockerfile
+    container_name: phoenixsekur-web
+    restart: unless-stopped
+
+  vitrine:
+    build: ./vitrine
+    container_name: phoenixsekur-vitrine
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: phoenixsekur-caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+      - vitrine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      VITRINE_DOMAIN: ${VITRINE_DOMAIN:-www.phoenixsekur.com}
+      ROOT_DOMAIN: ${ROOT_DOMAIN:-phoenixsekur.com}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:

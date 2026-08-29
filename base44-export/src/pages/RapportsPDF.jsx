@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { format, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { drawEntityHeader, drawLegalFooter } from '@/lib/pdfClientHeader';
+import { buildReportText } from '@/lib/reportBuilder';
 
 const MODULES = [
   { key: 'main_courante', label: 'Main courante', icon: '📋', description: 'Événements, observations, incidents' },
@@ -98,24 +99,14 @@ export default function RapportsPDF() {
         data.planning = missions.filter(e => e.date >= start && e.date <= end && (selectedClient === 'all' || e.client_id === selectedClient));
       }
 
-      // Generate PDF via LLM-assisted content
-      const reportContent = await base44.integrations.Core.InvokeLLM({
-        prompt: `Génère un rapport de sécurité professionnel en français pour la période du ${start} au ${end}.
-Société: ${settings[0]?.company_name || 'Non définie'}
-Client: ${client?.company_name || 'Tous les clients'}
-Modules inclus: ${activeModules.join(', ')}
-
-Données:
-- Rondes: ${data.rondes?.length || 0} exécutions
-- Main courante: ${data.main_courante?.length || 0} entrées
-- Incidents: ${data.incidents?.length || 0} alertes urgentes
-- Missions: ${data.planning?.length || 0} missions
-
-Détail des rondes: ${JSON.stringify((data.rondes || []).slice(0, 5))}
-Détail main courante: ${JSON.stringify((data.main_courante || []).slice(0, 5))}
-Incidents: ${JSON.stringify((data.incidents || []).slice(0, 5))}
-
-Génère un rapport structuré avec: résumé exécutif, statistiques clés, détail par module, conclusion.`,
+      // Contenu structuré (sans IA externe)
+      const reportContent = buildReportText({
+        companyName: settings[0]?.company_name,
+        start,
+        end,
+        clientName: client?.company_name,
+        modules: activeModules,
+        data,
       });
 
       // Build PDF using jsPDF
@@ -235,19 +226,42 @@ Génère un rapport structuré avec: résumé exécutif, statistiques clés, dé
 
       const pdfBlob = doc.output('blob');
       const fileName = `rapport-securite-${start}-${end}.pdf`;
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-      // Send by email if requested
+      const reportStats = {
+        rondes: data.rondes?.length || 0,
+        main_courante: data.main_courante?.length || 0,
+        incidents: data.incidents?.length || 0,
+        planning: data.planning?.length || 0,
+      };
+
+      // Envoi email via backend
       if (sendEmail) {
-        const pdfBase64 = doc.output('datauristring');
         const recipients = [emailClient, emailSociete || companyEmail].filter(Boolean);
-        for (const email of recipients) {
-          await base44.integrations.Core.SendEmail({
-            to: email,
-            subject: `Rapport de sécurité — ${start} au ${end}`,
-            body: `Bonjour,\n\nVeuillez trouver ci-joint le rapport de sécurité pour la période du ${start} au ${end}.\n\nModules inclus : ${activeModules.join(', ')}\n\nCordialement,\n${settings[0]?.company_name || 'Votre société de sécurité'}`,
-          });
+        const emailResult = await base44.reports.sendEmail({
+          to: recipients,
+          subject: `Rapport de sécurité — ${start} au ${end}`,
+          body: reportContent,
+          pdf_base64: pdfBase64,
+          filename: fileName,
+          start,
+          end,
+          modules: activeModules,
+          stats: reportStats,
+          company_name: settings[0]?.company_name,
+          save_schedule: autoSchedule,
+          schedule: autoSchedule ? {
+            frequency: scheduleFreq,
+            recipients: recipients.join(','),
+            modules: activeModules,
+            client_id: selectedClient,
+          } : undefined,
+        });
+        if (emailResult.success) {
+          toast.success(emailResult.message || `Rapport envoyé à ${recipients.join(', ')}`);
+        } else {
+          toast.warning(emailResult.message || 'SMTP non configuré — PDF téléchargé uniquement');
         }
-        toast.success(`Rapport envoyé à : ${recipients.join(', ')}`);
       }
 
       // Download
@@ -406,9 +420,9 @@ Génère un rapport structuré avec: résumé exécutif, statistiques clés, dé
                     <SelectItem value="monthly">Mensuel (1er du mois)</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                  L'envoi automatique utilise la fonction sendDailyReport déjà configurée.
+                  Préférez configurer l'envoi auto dans <strong>Paramètres société → Rapports clients</strong> pour envoyer à tous vos clients.
                 </div>
               </CardContent>
             )}

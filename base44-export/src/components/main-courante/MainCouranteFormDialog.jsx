@@ -10,9 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sparkles, Check } from 'lucide-react';
 import { EVENT_CATEGORIES, EVENT_TYPES, CATEGORY_LEGACY_TYPE, getEventMeta } from '@/lib/mainCouranteEvents';
 import { format } from 'date-fns';
+import { useCompany } from '@/lib/useCompany';
 
 export default function MainCouranteFormDialog({ open, onOpenChange, sites, agents }) {
   const qc = useQueryClient();
+  const { companyId } = useCompany();
   const [category, setCategory] = useState('service');
   const [eventType, setEventType] = useState('debut_service');
   const [form, setForm] = useState({
@@ -50,6 +52,7 @@ export default function MainCouranteFormDialog({ open, onOpenChange, sites, agen
     if (!form.site_id || !form.content) return;
     const payload = {
       ...form,
+      company_id: companyId,
       category,
       event_type: eventType,
       auto: false,

@@ -1,18 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, Clock, AlertTriangle, CheckCircle2, Download, MapPin, Navigation, BookOpen, Bell, Calendar, Lock } from 'lucide-react';
+import {
+  Clock, AlertTriangle, CheckCircle2, Download, MapPin, Navigation,
+  BookOpen, Bell, Calendar, Lock, Phone, Mail, CreditCard, Building2,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { useGeolocation } from '@/lib/useGeolocation';
+import { useFallDetection } from '@/lib/useFallDetection';
+import PtiCheckOverlay from '@/components/agent/PtiCheckOverlay';
+import { toast } from 'sonner';
 import PriseDeServiceNFC from '@/components/agent/PriseDeServiceNFC';
+import FinDeServicePhoto from '@/components/agent/FinDeServicePhoto';
 import RondeNFC from '@/components/agent/RondeNFC';
+import ServiceChrono from '@/components/agent/ServiceChrono';
+import ServiceNonPlanifie from '@/components/agent/ServiceNonPlanifie';
+import ServiceEnCours from '@/components/agent/ServiceEnCours';
+import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpand';
+import { mergeAgentDroits, assignedSiteIds, accountDisplayName } from '@/lib/agentPortal';
+import PlanningMapView from '@/components/planning/PlanningMapView';
+import { canStartPlannedService, isServiceOverdue } from '@/lib/serviceStartRules';
+import { RUN_STATUS_META, resolveEmergencyTel, vacationRunStatus } from '@/lib/vacationStatus';
+import { dialNumber } from '@/lib/ptiAlarm';
 
 const CATEGORY_CONFIG = {
   general: { label: 'Général', color: 'bg-gray-100 text-gray-700' },
@@ -33,13 +53,47 @@ function AccessDenied({ label }) {
   );
 }
 
+function MissionCard({ mission, today, trailing }) {
+  const day = normalizeDateKey(mission.date);
+  const dateObj = day ? new Date(`${day}T12:00:00`) : null;
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-4">
+        <div className="text-center w-12 shrink-0">
+          <p className="text-lg font-bold text-primary">{dateObj ? format(dateObj, 'd', { locale: fr }) : '—'}</p>
+          <p className="text-xs text-muted-foreground uppercase">{dateObj ? format(dateObj, 'MMM', { locale: fr }) : ''}</p>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium truncate">{mission.title}</p>
+          <p className="text-sm text-muted-foreground">{mission.site_name} • {mission.start_time} - {mission.end_time}</p>
+        </div>
+        {trailing || (
+          <Badge variant="outline" className="shrink-0">
+            {day === today ? "Aujourd'hui" : dateObj ? format(dateObj, 'EEE', { locale: fr }) : ''}
+          </Badge>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function EspaceAgent() {
-  const [activeTab, setActiveTab] = useState('accueil');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab') || 'accueil';
+  const activeTab = rawTab === 'pti' ? 'accueil' : rawTab;
+  const setActiveTab = (tab) => {
+    if (tab === 'accueil') setSearchParams({});
+    else setSearchParams({ tab });
+  };
   const [showPriseForm, setShowPriseForm] = useState(false);
+  const [showFinService, setShowFinService] = useState(false);
   const [selectedMission, setSelectedMission] = useState(null);
   const [showRondeDialog, setShowRondeDialog] = useState(false);
   const [selectedRonde, setSelectedRonde] = useState(null);
   const [selectedConsigne, setSelectedConsigne] = useState(null);
+  const [showDemandeForm, setShowDemandeForm] = useState(false);
+  const [demandeForm, setDemandeForm] = useState({ subject: '', message: '' });
+  const [planDay, setPlanDay] = useState(() => new Date());
   const [lastSeenConsignes, setLastSeenConsignes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('last_seen_consignes') || '{}'); } catch { return {}; }
   });
@@ -47,94 +101,257 @@ export default function EspaceAgent() {
   const qc = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Charger la fiche agent pour récupérer ses droits
   const { data: agentFiche } = useQuery({
     queryKey: ['ma_fiche_agent', user?.email, companyId],
     queryFn: async () => {
       const agents = await base44.entities.Agent.filter({ company_id: companyId });
-      return agents.find(a => a.email === user?.email) || null;
+      const email = String(user?.email || '').toLowerCase();
+      const byEmail = agents.find((a) => String(a.email || '').toLowerCase() === email);
+      if (byEmail) return byEmail;
+      const full = String(user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`).toLowerCase();
+      return agents.find((a) => {
+        const n = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
+        return full && n && (full.includes(String(a.last_name || '').toLowerCase()) || n.includes(full));
+      }) || null;
     },
     enabled: !!companyId && !!user,
   });
 
-  // Droits portail de l'agent (avec défauts permissifs si pas de fiche)
-  const droits = agentFiche?.droits_portail || {
-    acces_planning: true, acces_services: true, acces_ecarts: false,
-    acces_rondes: true, acces_main_courante: false, acces_pti: true,
-    acces_conges: true, acces_documents: true, acces_consignes: true,
-  };
+  const droits = mergeAgentDroits(agentFiche);
+  const agentName = accountDisplayName(user, agentFiche);
 
-  const { data: missions = [] } = useQuery({ queryKey: ['missions', companyId], queryFn: () => base44.entities.Mission.filter({ company_id: companyId }, '-date', 50), enabled: !!companyId });
-  const { data: services = [] } = useQuery({ queryKey: ['prises_service', companyId], queryFn: () => base44.entities.PriseDeService.filter({ company_id: companyId }, '-date', 30), enabled: !!companyId });
+  const { data: missions = [] } = useQuery({
+    queryKey: ['missions', companyId, agentFiche?.id],
+    queryFn: () => base44.entities.Mission.filter({ company_id: companyId }, '-date', 800),
+    enabled: !!companyId,
+  });
+  const { data: sites = [] } = useQuery({
+    queryKey: ['sites', companyId],
+    queryFn: () => base44.entities.Site.filter({ company_id: companyId }),
+    enabled: !!companyId,
+  });
+  const { data: settingsRows = [] } = useQuery({
+    queryKey: ['company_settings', companyId],
+    queryFn: () => base44.entities.CompanySettings.filter({ company_id: companyId }),
+    enabled: !!companyId,
+  });
+  const companySettings = settingsRows[0] || {};
+  const { data: services = [] } = useQuery({
+    queryKey: ['prises_service', companyId],
+    queryFn: () => base44.entities.PriseDeService.filter({ company_id: companyId }, '-date', 80),
+    enabled: !!companyId,
+  });
   const { data: rondes = [] } = useQuery({
     queryKey: ['rondes_agent', agentFiche?.id],
     queryFn: () => base44.entities.Ronde.filter({ company_id: companyId }),
-    enabled: !!companyId && droits.acces_rondes,
+    enabled: !!companyId && !!droits.acces_rondes,
   });
   const { data: mainCouranteData = [] } = useQuery({
     queryKey: ['mc_agent', companyId],
     queryFn: () => base44.entities.MainCourante.filter({ company_id: companyId }, '-date', 100),
-    enabled: !!companyId && droits.acces_main_courante,
+    enabled: !!companyId && !!droits.acces_main_courante,
   });
   const { data: ecarts = [] } = useQuery({
     queryKey: ['ecarts_agent', user?.email, companyId],
     queryFn: () => base44.entities.PriseDeService.filter({ company_id: companyId }, '-date', 50),
-    enabled: !!companyId && droits.acces_ecarts,
+    enabled: !!companyId && !!droits.acces_ecarts,
   });
   const { data: fiches = [] } = useQuery({
     queryKey: ['fiches_paie', companyId],
     queryFn: () => base44.entities.FicheDePaie.filter({ company_id: companyId }, '-year', 24),
-    enabled: !!companyId && droits.acces_documents,
+    enabled: !!companyId && !!droits.acces_documents,
   });
   const { data: demandes = [] } = useQuery({
     queryKey: ['mes_demandes'],
     queryFn: () => base44.entities.Demande.filter({ from_type: 'agent', company_id: companyId }, '-created_date', 20),
-    enabled: !!companyId && droits.acces_conges,
+    enabled: !!companyId && !!droits.acces_conges,
   });
   const { data: docs = [] } = useQuery({
     queryKey: ['mes_docs'],
     queryFn: () => base44.entities.Document.filter({ company_id: companyId }, '-created_date', 50),
-    enabled: !!companyId && droits.acces_documents,
+    enabled: !!companyId && !!droits.acces_documents,
   });
-  const { data: consignes = [] } = useQuery({
+  const { data: consignesRaw = [] } = useQuery({
     queryKey: ['cahier_consignes', companyId],
     queryFn: () => base44.entities.CahierConsignes.filter({ company_id: companyId, active: true }, '-updated_date', 100),
-    enabled: !!companyId && droits.acces_consignes,
+    enabled: !!companyId && !!droits.acces_consignes,
   });
 
-  const serviceUpdateMut = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.PriseDeService.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['prises_service'] }),
+  const visibility = {
+    agentId: agentFiche?.id,
+    userId: user?.id,
+    agentEmail: user?.email || agentFiche?.email,
+    agentName,
+    firstName: agentFiche?.first_name || user?.first_name,
+    lastName: agentFiche?.last_name || user?.last_name,
+  };
+
+  const myMissions = useMemo(
+    () => missions
+      .filter((m) => isMissionVisibleToAgent(m, visibility))
+      .sort((a, b) => `${normalizeDateKey(a.date)} ${a.start_time || ''}`.localeCompare(`${normalizeDateKey(b.date)} ${b.start_time || ''}`)),
+    [missions, agentFiche?.id, user?.id, user?.email, agentName],
+  );
+
+  const todayMissions = myMissions.filter((m) => normalizeDateKey(m.date) === today);
+  const futureMissions = myMissions.filter((m) => normalizeDateKey(m.date) >= today);
+  const siteIdSet = assignedSiteIds({ missions: myMissions, sites, agentId: agentFiche?.id });
+  const assignedSites = sites.filter((s) => siteIdSet.includes(s.id));
+  const consignes = consignesRaw.filter((c) => !c.site_id || siteIdSet.includes(c.site_id));
+  const currentService = services.find((s) => {
+    if (normalizeDateKey(s.date) !== today || s.status !== 'en_service') return false;
+    if (s.agent_id && (s.agent_id === user?.id || s.agent_id === agentFiche?.id)) return true;
+    if (s.agent_name && visibility.lastName && String(s.agent_name).toLowerCase().includes(String(visibility.lastName).toLowerCase())) return true;
+    if (!s.agent_id) return true;
+    return false;
   });
+
+  const { data: currentSite } = useQuery({
+    queryKey: ['site_geofence', currentService?.site_id],
+    queryFn: () => base44.entities.Site.get(currentService.site_id),
+    enabled: !!currentService?.site_id,
+  });
+  const clientId = currentSite?.client_id || currentService?.client_id;
+  const { data: currentClient } = useQuery({
+    queryKey: ['client_urgence', clientId],
+    queryFn: () => base44.entities.Client.get(clientId),
+    enabled: !!clientId,
+  });
+
   const mcCreateMut = useMutation({ mutationFn: (data) => base44.entities.MainCourante.create(data) });
   const alerteMut = useMutation({ mutationFn: (data) => base44.entities.Alerte.create(data) });
   const demandeMut = useMutation({
     mutationFn: (data) => base44.entities.Demande.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['mes_demandes'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['mes_demandes'] });
+      setShowDemandeForm(false);
+      setDemandeForm({ subject: '', message: '' });
+      toast.success('Demande envoyée à la société');
+    },
   });
 
-  const todayMissions = missions.filter(m => m.date === today);
-  const futureMissions = missions.filter(m => m.date >= today).slice(0, 15);
-  const currentService = services.find(s => s.date === today && s.status === 'en_service');
+  const geofenceAlertRef = useRef(false);
 
-  // Main courante filtrée sur les sites de l'agent
-  const agentSiteIds = [...new Set(missions.map(m => m.site_id).filter(Boolean))];
-  const mcFiltered = mainCouranteData.filter(mc => agentSiteIds.includes(mc.site_id));
+  const handleGeofenceViolation = useCallback(async ({ latitude, longitude }) => {
+    if (!currentService || geofenceAlertRef.current) return;
+    geofenceAlertRef.current = true;
+    const now = format(new Date(), 'HH:mm');
+    await alerteMut.mutateAsync({
+      company_id: companyId,
+      type: 'geofence',
+      agent_id: user?.id,
+      agent_name: agentName,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      message: `⚠️ ${agentName} hors zone autorisée sur ${currentService.site_name} (${now})`,
+      latitude,
+      longitude,
+      date: today,
+      time: now,
+      severity: 'urgent',
+    });
+    await mcCreateMut.mutateAsync({
+      company_id: companyId,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      agent_id: user?.id,
+      agent_name: agentName,
+      mission_id: currentService.mission_id,
+      service_id: currentService.id,
+      date: today,
+      time: now,
+      type: 'geofence',
+      content: `Sortie de périmètre détectée — rayon ${currentSite?.geofence_radius || 200} m`,
+      latitude,
+      longitude,
+      severity: 'urgent',
+    });
+    toast.error('Hors zone — alerte envoyée au centre');
+    qc.invalidateQueries({ queryKey: ['alertes'] });
+    setTimeout(() => { geofenceAlertRef.current = false; }, 120000);
+  }, [currentService, companyId, user, agentName, today, currentSite, alerteMut, mcCreateMut, qc]);
 
-  // Rondes filtrées sur les sites de l'agent
-  const rondesFiltrees = rondes.filter(r => agentSiteIds.includes(r.site_id));
-
-  const { position } = useGeolocation({
+  const { position, outsideZone } = useGeolocation({
     active: !!currentService,
     agentId: user?.id,
-    agentName: user ? `${user.first_name || ''} ${user.last_name || user.full_name || ''}`.trim() : '',
+    agentName,
     serviceId: currentService?.id,
     siteId: currentService?.site_id,
     siteName: currentService?.site_name,
     companyId,
+    siteLatitude: currentSite?.latitude,
+    siteLongitude: currentSite?.longitude,
+    geofenceRadius: currentSite?.geofence_radius ?? 200,
+    onGeofenceViolation: handleGeofenceViolation,
   });
 
-  const newConsignes = consignes.filter(c => {
+  const triggerPtiAlerte = useCallback(async (reason) => {
+    if (!currentService) return;
+    const now = format(new Date(), 'HH:mm');
+    await mcCreateMut.mutateAsync({
+      company_id: companyId,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      agent_id: user?.id,
+      agent_name: agentName,
+      mission_id: currentService.mission_id,
+      service_id: currentService.id,
+      date: today,
+      time: now,
+      type: 'pti_alerte',
+      content: reason || `⚠️ ALERTE PTI déclenchée à ${now}`,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+      severity: 'urgent',
+    });
+    await alerteMut.mutateAsync({
+      company_id: companyId,
+      type: 'pti_alerte',
+      agent_id: user?.id,
+      agent_name: agentName,
+      site_id: currentService.site_id,
+      site_name: currentService.site_name,
+      client_name: currentService.client_name,
+      message: `⚠️ ALERTE PTI - ${agentName} sur ${currentService.site_name} à ${now}`,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+      date: today,
+      time: now,
+      severity: 'urgent',
+    });
+    qc.invalidateQueries({ queryKey: ['alertes'] });
+  }, [currentService, companyId, user, agentName, today, position, mcCreateMut, alerteMut, qc]);
+
+  const handlePtiAlerte = async (reason) => {
+    await triggerPtiAlerte(reason || `⚠️ ALERTE PTI manuelle à ${format(new Date(), 'HH:mm')}`);
+    toast.error('Alerte PTI envoyée');
+  };
+
+  const { pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
+    active: !!currentService && droits.acces_pti,
+    onFallConfirmed: () => {
+      handlePtiAlerte('⚠️ ALERTE PTI — perte de verticalité');
+    },
+  });
+
+  useEffect(() => {
+    if (currentService && droits.acces_pti) requestArm();
+  }, [currentService?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const agentSiteIds = siteIdSet;
+  const mcFiltered = mainCouranteData.filter((mc) => agentSiteIds.includes(mc.site_id));
+  const rondesFiltrees = rondes.filter((r) => agentSiteIds.includes(r.site_id));
+  const checkpoints = rondesFiltrees.flatMap((r) => (r.checkpoints || []).map((cp) => ({
+    ...cp,
+    ronde_name: r.name,
+    site_name: r.site_name,
+    site_id: r.site_id,
+  })));
+
+  const newConsignes = consignes.filter((c) => {
     const lastSeen = lastSeenConsignes[c.id];
     if (!lastSeen) return true;
     return new Date(c.updated_date) > new Date(lastSeen);
@@ -143,96 +360,113 @@ export default function EspaceAgent() {
   const markConsignesRead = () => {
     const now = new Date().toISOString();
     const updated = { ...lastSeenConsignes };
-    consignes.forEach(c => { updated[c.id] = now; });
+    consignes.forEach((c) => { updated[c.id] = now; });
     setLastSeenConsignes(updated);
     localStorage.setItem('last_seen_consignes', JSON.stringify(updated));
   };
 
-  const handleFinService = async () => {
+  const handleFinService = () => {
     if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
-    await serviceUpdateMut.mutateAsync({
-      id: currentService.id,
-      data: { actual_end: now, status: 'termine', end_latitude: position?.latitude, end_longitude: position?.longitude }
-    });
-    await mcCreateMut.mutateAsync({
-      company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
-      client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
-      date: today, time: now, type: 'depart',
-      content: `Fin de service - ${agentName} a quitté le site à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
-    });
-    await alerteMut.mutateAsync({
-      company_id: companyId, type: 'fin_service', agent_id: user?.id, agent_name: agentName,
-      site_id: currentService.site_id, site_name: currentService.site_name, client_name: currentService.client_name,
-      message: `${agentName} a terminé son service sur ${currentService.site_name} à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, date: today, time: now, severity: 'info',
-    });
-    qc.invalidateQueries({ queryKey: ['alertes'] });
-  };
-
-  const handlePtiCheck = async () => {
-    if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
-    await mcCreateMut.mutateAsync({
-      company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
-      client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
-      date: today, time: now, type: 'pti_ok',
-      content: `PTI - Confirmation de présence à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
-    });
-  };
-
-  const handlePtiAlerte = async () => {
-    if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
-    await mcCreateMut.mutateAsync({
-      company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
-      client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
-      date: today, time: now, type: 'pti_alerte',
-      content: `⚠️ ALERTE PTI déclenchée à ${now} - Vérification immédiate requise`,
-      latitude: position?.latitude, longitude: position?.longitude, severity: 'urgent',
-    });
-    await alerteMut.mutateAsync({
-      company_id: companyId, type: 'pti_alerte', agent_id: user?.id, agent_name: agentName,
-      site_id: currentService.site_id, site_name: currentService.site_name, client_name: currentService.client_name,
-      message: `⚠️ ALERTE PTI - ${agentName} sur ${currentService.site_name} à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, date: today, time: now, severity: 'urgent',
-    });
-    qc.invalidateQueries({ queryKey: ['alertes'] });
+    setShowFinService(true);
   };
 
   const startRonde = async (ronde) => {
+    if (currentService && isServiceOverdue(currentService) && !currentService.prolongation_motif) {
+      toast.error('Heure de fin dépassée : déclarez une prolongation avec motif avant de continuer.');
+      setActiveTab('service');
+      return;
+    }
     const now = format(new Date(), 'HH:mm');
-    const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
     await alerteMut.mutateAsync({
-      company_id: companyId, type: 'debut_ronde', agent_id: user?.id, agent_name: agentName,
+      company_id: companyId, type: 'debut_ronde', agent_id: priseAgentId, agent_name: agentName,
       site_id: ronde.site_id, site_name: ronde.site_name,
       message: `${agentName} a démarré la ronde "${ronde.name}" sur ${ronde.site_name} à ${now}`,
       date: today, time: now, severity: 'info',
     });
+    await mcCreateMut.mutateAsync({
+      company_id: companyId,
+      site_id: ronde.site_id,
+      site_name: ronde.site_name,
+      client_name: currentService?.client_name,
+      agent_id: priseAgentId,
+      agent_name: agentName,
+      mission_id: currentService?.mission_id,
+      service_id: currentService?.id,
+      date: today,
+      time: now,
+      type: 'debut_ronde',
+      event_type: 'debut_ronde',
+      content: `Début de ronde « ${ronde.name} » à ${now} — ${agentName}`,
+      severity: 'normal',
+    });
     qc.invalidateQueries({ queryKey: ['alertes'] });
+    qc.invalidateQueries({ queryKey: ['mc_service'] });
     setSelectedRonde(ronde);
     setShowRondeDialog(true);
   };
 
-  const agentName = user ? (user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim()) : '';
-  const agentDocs = docs.filter(d => d.target_type === 'tous' || (d.target_type === 'agent' && d.target_id === user?.id));
+  const openPrise = (mission) => {
+    const check = canStartPlannedService(mission);
+    if (!check.ok) {
+      toast.error(check.reason);
+      return;
+    }
+    setSelectedMission(mission);
+    setShowPriseForm(true);
+  };
+
+  const agentDocs = docs.filter((d) => d.target_type === 'tous' || (d.target_type === 'agent' && d.target_id === user?.id));
+  const priseAgentId = agentFiche?.id || user?.id;
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Espace Agent</h1>
-          <p className="text-muted-foreground mt-1">Bonjour {agentName || 'Agent'} 👋</p>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="sticky z-20 -mx-3 sm:-mx-4 xl:-mx-8 px-3 sm:px-4 xl:px-8 bg-background/95 backdrop-blur border-b mb-4 top-0 overflow-x-auto tabs-scroll">
+          <TabsList className="flex w-max min-w-full h-12 bg-transparent p-0 rounded-none justify-start gap-0 flex-nowrap">
+            {[
+              { value: 'accueil', label: 'Accueil', show: true },
+              { value: 'service', label: 'Service', show: droits.acces_services },
+              { value: 'nonplanifie', label: 'Non planifié', show: droits.acces_service_non_planifie },
+              { value: 'planning', label: 'Planning', show: droits.acces_planning },
+              { value: 'rondes', label: 'Rondes', show: droits.acces_rondes },
+              { value: 'checkpoints', label: 'Contrôles', show: droits.acces_points_controle },
+              { value: 'maincourante', label: 'Main courante', show: droits.acces_main_courante },
+              { value: 'ecarts', label: 'Écarts', show: droits.acces_ecarts },
+              { value: 'consignes', label: 'Consignes', show: droits.acces_consignes, badge: newConsignes.length },
+              { value: 'carte', label: 'Carte pro', show: droits.acces_carte_pro },
+              { value: 'contact', label: 'Agence', show: droits.acces_contact_societe },
+              { value: 'documents', label: 'Documents', show: droits.acces_documents },
+              { value: 'demandes', label: 'Demandes', show: droits.acces_conges },
+            ].filter((t) => t.show).map((t) => (
+              <TabsTrigger
+                key={t.value}
+                value={t.value}
+                className="relative shrink-0 rounded-none h-12 px-3.5 border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-foreground"
+              >
+                {t.label}
+                {t.badge > 0 && (
+                  <span className="ml-1 inline-flex w-4 h-4 bg-amber-500 text-white rounded-full text-[10px] items-center justify-center">{t.badge}</span>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </div>
-        <div className="flex items-center gap-2">
+
+      <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Bonjour {agentName || 'collaborateur'}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Espace Agent</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {currentService && (
+            <Badge className="gap-1 bg-green-600 text-white">
+              <Clock className="w-3 h-3" />
+              <ServiceChrono service={currentService} className="text-sm text-white" />
+            </Badge>
+          )}
           {newConsignes.length > 0 && droits.acces_consignes && (
             <Badge className="gap-1 bg-amber-500 text-white cursor-pointer" onClick={() => { setActiveTab('consignes'); markConsignesRead(); }}>
-              <Bell className="w-3 h-3" /> {newConsignes.length} mise(s) à jour
+              <Bell className="w-3 h-3" /> {newConsignes.length} consigne(s)
             </Badge>
           )}
           {currentService && position && (
@@ -240,194 +474,161 @@ export default function EspaceAgent() {
               <Navigation className="w-3 h-3" /> GPS actif
             </Badge>
           )}
+          {outsideZone && (
+            <Badge className="gap-1 bg-red-600 text-white">
+              <MapPin className="w-3 h-3" /> Hors zone
+            </Badge>
+          )}
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 flex-wrap h-auto gap-1">
-          <TabsTrigger value="accueil">Accueil</TabsTrigger>
-          {droits.acces_services && <TabsTrigger value="service">Service</TabsTrigger>}
-          {droits.acces_pti && <TabsTrigger value="pti">PTI</TabsTrigger>}
-          {droits.acces_planning && <TabsTrigger value="planning">Planning</TabsTrigger>}
-          {droits.acces_rondes && <TabsTrigger value="rondes">Rondes</TabsTrigger>}
-          {droits.acces_main_courante && <TabsTrigger value="maincourante">Main courante</TabsTrigger>}
-          {droits.acces_ecarts && <TabsTrigger value="ecarts">Écarts</TabsTrigger>}
-          {droits.acces_consignes && (
-            <TabsTrigger value="consignes" className="relative">
-              Consignes
-              {newConsignes.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-white rounded-full text-[10px] flex items-center justify-center">{newConsignes.length}</span>
-              )}
-            </TabsTrigger>
-          )}
-          {droits.acces_documents && <TabsTrigger value="documents">Documents</TabsTrigger>}
-          {droits.acces_conges && <TabsTrigger value="demandes">Demandes</TabsTrigger>}
-        </TabsList>
-
-        {/* ===== ACCUEIL ===== */}
         <TabsContent value="accueil" className="space-y-4">
-          {currentService ? (
-            <Card className="p-5 border-2 border-green-400 bg-green-50">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="font-semibold text-green-700">En service</span>
+          {droits.acces_consignes && (
+            <Card
+              className={`p-4 cursor-pointer ${newConsignes.length > 0 ? 'border-amber-400 bg-amber-50' : 'border-border'}`}
+              onClick={() => { setActiveTab('consignes'); markConsignesRead(); }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 font-semibold">
+                  <BookOpen className="w-4 h-4" />
+                  Cahier de consignes
+                </div>
+                {newConsignes.length > 0 ? (
+                  <Badge className="bg-amber-500 text-white gap-1"><Bell className="w-3 h-3" />{newConsignes.length} nouvelle(s)</Badge>
+                ) : (
+                  <Badge variant="outline">{consignes.length} consigne(s)</Badge>
+                )}
               </div>
-              <p className="font-bold text-lg">{currentService.site_name}</p>
-              <p className="text-sm text-muted-foreground">Depuis {currentService.actual_start}</p>
-              {droits.acces_services && <Button variant="destructive" size="sm" className="mt-3" onClick={handleFinService}>Terminer le service</Button>}
-            </Card>
-          ) : (
-            <Card className="p-5">
-              <h2 className="font-semibold mb-3">Missions du jour</h2>
-              {todayMissions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune mission assignée aujourd'hui.</p>
-              ) : (
-                <div className="space-y-2">
-                  {todayMissions.map(m => (
-                    <div key={m.id} className="flex items-center justify-between p-3 border border-border rounded-xl">
-                      <div>
-                        <p className="font-medium text-sm">{m.title}</p>
-                        <p className="text-xs text-muted-foreground">{m.site_name} • {m.start_time} - {m.end_time}</p>
-                      </div>
-                      {droits.acces_services && (
-                        <Button size="sm" onClick={() => { setSelectedMission(m); setShowPriseForm(true); }} className="gap-1.5">
-                          <Clock className="w-3.5 h-3.5" /> Prendre le service
-                        </Button>
-                      )}
-                    </div>
+              {newConsignes.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {newConsignes.slice(0, 3).map((c) => (
+                    <p key={c.id} className="text-xs text-amber-800">• {c.title} — {c.site_name}</p>
                   ))}
                 </div>
               )}
             </Card>
           )}
 
-          {newConsignes.length > 0 && droits.acces_consignes && (
-            <Card className="p-4 border-amber-300 bg-amber-50">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-amber-700 font-semibold">
-                  <Bell className="w-4 h-4" />
-                  {newConsignes.length} consigne(s) mise(s) à jour
+          {currentService && (
+            <button type="button" className="w-full text-left" onClick={() => setActiveTab('service')}>
+              <Card className="p-5 border-2 border-green-400 bg-green-50">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                      <span className="font-semibold text-green-700">En service — ouvrir le détail</span>
+                    </div>
+                    <p className="font-bold text-lg">{currentService.site_name}</p>
+                    <p className="text-sm text-muted-foreground">Prise de service à {currentService.actual_start}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground mb-1">Temps écoulé</p>
+                    <ServiceChrono service={currentService} className="text-green-800" />
+                  </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => { setActiveTab('consignes'); markConsignesRead(); }} className="text-amber-700 text-xs">Voir →</Button>
-              </div>
-              <div className="space-y-1">
-                {newConsignes.slice(0, 3).map(c => (
-                  <p key={c.id} className="text-xs text-amber-700">• {c.title} — {c.site_name}</p>
-                ))}
-              </div>
-            </Card>
+              </Card>
+            </button>
           )}
 
-          <Card className="p-5">
-            <h2 className="font-semibold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4" />Prochaines vacations</h2>
-            {futureMissions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucune vacation à venir.</p>
-            ) : (
-              <div className="space-y-2">
-                {futureMissions.slice(0, 5).map(m => (
-                  <div key={m.id} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                    <div className="text-center w-10 shrink-0">
-                      <p className="text-base font-bold text-primary">{format(new Date(m.date), 'd', { locale: fr })}</p>
-                      <p className="text-[10px] text-muted-foreground uppercase">{format(new Date(m.date), 'MMM', { locale: fr })}</p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{m.title}</p>
-                      <p className="text-xs text-muted-foreground">{m.site_name} • {m.start_time}-{m.end_time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+          <div className="-mx-3 sm:-mx-4 xl:mx-0">
+            <PlanningMapView
+              compact
+              missions={myMissions}
+              prises={services}
+              sites={sites}
+              selected={planDay}
+              onSelectDay={setPlanDay}
+              currentService={currentService}
+              onOpenMission={(m, meta) => {
+                if (meta?.enCours) { setActiveTab('service'); return; }
+                if (normalizeDateKey(m.date) === today && droits.acces_services && !currentService) openPrise(m);
+                else if (droits.acces_planning) setActiveTab('planning');
+              }}
+            />
+          </div>
+
         </TabsContent>
 
-        {/* ===== SERVICE ===== */}
         <TabsContent value="service" className="space-y-4">
           {!droits.acces_services ? <AccessDenied label="Services" /> : (
+            <>
+              {currentService && (
+                <ServiceEnCours
+                  service={currentService}
+                  mission={myMissions.find((m) => m.id === currentService.mission_id) || todayMissions[0]}
+                  site={currentSite}
+                  client={currentClient}
+                  rondes={rondesFiltrees}
+                  companyId={companyId}
+                  agentId={priseAgentId}
+                  agentName={agentName}
+                  onStartRonde={startRonde}
+                  onFinService={handleFinService}
+                />
+              )}
+              <div className="space-y-3">
+                {!currentService && <h2 className="text-lg font-semibold">Vacations du jour</h2>}
+                {currentService && todayMissions.some((m) => m.id !== currentService.mission_id) && (
+                  <h3 className="text-sm font-semibold text-muted-foreground">Autres vacations du jour</h3>
+                )}
+                {todayMissions.length === 0 && !currentService && (
+                  <p className="text-muted-foreground text-sm">Aucune vacation assignée aujourd'hui.</p>
+                )}
+                {todayMissions.filter((m) => !currentService || m.id !== currentService.mission_id).map((m) => {
+                  const prise = services.find((s) => s.mission_id === m.id);
+                  const status = vacationRunStatus(prise);
+                  const meta = RUN_STATUS_META[status];
+                  const check = canStartPlannedService(m);
+                  return (
+                    <Card key={m.id} className="p-4 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="bg-emerald-500 text-white">Planifié</Badge>
+                        <Badge className={meta.className}>{meta.label}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Le {format(new Date(`${normalizeDateKey(m.date)}T12:00:00`), 'dd/MM/yyyy')} de {m.start_time} à {m.end_time}</p>
+                      <p className="font-bold">{m.site_name}</p>
+                      {m.site_address && <p className="text-sm text-muted-foreground">{m.site_address}</p>}
+                      {status === 'en_attente' && !currentService && (
+                        <Button onClick={() => openPrise(m)} className="gap-2" disabled={!check.ok}>
+                          <Clock className="w-4 h-4" /> {check.ok ? 'Prendre le service' : check.tooLate ? 'Hors horaires' : `Dès ${m.start_time}`}
+                        </Button>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="nonplanifie">
+          {!droits.acces_service_non_planifie ? <AccessDenied label="Service non planifié" /> : (
             currentService ? (
-              <Card className="p-6 border-2 border-primary/40 bg-primary/5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                  <h2 className="text-lg font-semibold text-green-600">En service actuellement</h2>
-                </div>
-                <p className="font-bold text-xl">{currentService.site_name}</p>
-                <p className="text-muted-foreground">{currentService.client_name}</p>
-                <div className="mt-3 space-y-1 text-sm">
-                  <p>Arrivée : <strong>{currentService.actual_start}</strong></p>
-                  <p>Fin prévue : <strong>{currentService.planned_end}</strong></p>
-                  {position && <p className="flex items-center gap-1 text-xs text-muted-foreground mt-2"><Navigation className="w-3 h-3 text-green-500" /> GPS actif</p>}
-                </div>
-                {currentService.start_photo_url && <img src={currentService.start_photo_url} alt="Photo service" className="mt-3 w-24 h-24 rounded-xl object-cover border" />}
-                <Button variant="destructive" className="mt-4" onClick={handleFinService}>Terminer le service</Button>
+              <Card className="p-5">
+                <p className="font-medium">Un service est déjà en cours.</p>
+                <p className="text-sm text-muted-foreground mt-1">Terminez-le avant d’en commencer un autre.</p>
+                <ServiceChrono service={currentService} className="mt-3" />
               </Card>
             ) : (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Missions du jour</h2>
-                {todayMissions.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Aucune mission assignée aujourd'hui.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {todayMissions.map(m => (
-                      <div key={m.id} className="flex items-center justify-between p-4 border border-border rounded-xl">
-                        <div>
-                          <p className="font-medium">{m.title}</p>
-                          <p className="text-sm text-muted-foreground">{m.site_name} • {m.start_time} - {m.end_time}</p>
-                        </div>
-                        <Button onClick={() => { setSelectedMission(m); setShowPriseForm(true); }} className="gap-2">
-                          <Clock className="w-4 h-4" /> Prendre le service
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
+              <ServiceNonPlanifie sites={assignedSites.length ? assignedSites : sites} onStart={openPrise} />
             )
           )}
         </TabsContent>
 
-        {/* ===== PTI ===== */}
-        <TabsContent value="pti">
-          {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
-            <Card className={`p-8 text-center border-2 ${!currentService ? 'border-border opacity-70' : 'border-border'}`}>
-              <Shield className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-xl font-bold mb-2">Protection Travailleur Isolé</h2>
-              <p className="text-muted-foreground mb-6 text-sm">En cas de non-réponse, une alerte urgente est déclenchée immédiatement</p>
-              {!currentService ? (
-                <p className="text-amber-600 font-medium p-3 bg-amber-50 rounded-xl">Prenez votre service pour activer le PTI</p>
-              ) : (
-                <div className="flex gap-4 justify-center">
-                  <Button size="lg" className="gap-2 bg-green-600 hover:bg-green-700 min-w-36" onClick={handlePtiCheck}>
-                    <CheckCircle2 className="w-5 h-5" /> Je suis OK
-                  </Button>
-                  <Button size="lg" variant="destructive" className="gap-2 min-w-36" onClick={handlePtiAlerte}>
-                    <AlertTriangle className="w-5 h-5" /> ALERTE PTI
-                  </Button>
-                </div>
-              )}
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* ===== PLANNING ===== */}
         <TabsContent value="planning">
           {!droits.acces_planning ? <AccessDenied label="Planning" /> : (
             <>
-              <h2 className="text-lg font-semibold mb-4">Mes prochaines vacations</h2>
+              <h2 className="text-lg font-semibold mb-4">Mes vacations actuelles et futures</h2>
               <div className="space-y-3">
-                {futureMissions.map(m => (
-                  <Card key={m.id} className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="text-center w-12 shrink-0">
-                        <p className="text-lg font-bold text-primary">{format(new Date(m.date), 'd', { locale: fr })}</p>
-                        <p className="text-xs text-muted-foreground uppercase">{format(new Date(m.date), 'MMM', { locale: fr })}</p>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{m.title}</p>
-                        <p className="text-sm text-muted-foreground">{m.site_name} • {m.start_time} - {m.end_time}</p>
-                      </div>
-                      <Badge variant="outline" className="shrink-0">{m.date === today ? 'Aujourd\'hui' : format(new Date(m.date), 'EEE', { locale: fr })}</Badge>
-                    </div>
-                  </Card>
+                {futureMissions.map((m) => (
+                  <MissionCard
+                    key={m.id}
+                    mission={m}
+                    today={today}
+                    trailing={droits.acces_services && normalizeDateKey(m.date) === today && !currentService && canStartPlannedService(m).ok ? (
+                      <Button size="sm" onClick={() => openPrise(m)}>Pointer</Button>
+                    ) : null}
+                  />
                 ))}
                 {futureMissions.length === 0 && <p className="text-muted-foreground text-sm">Aucune vacation à venir.</p>}
               </div>
@@ -435,13 +636,12 @@ export default function EspaceAgent() {
           )}
         </TabsContent>
 
-        {/* ===== RONDES ===== */}
         <TabsContent value="rondes" className="space-y-4">
           {!droits.acces_rondes ? <AccessDenied label="Rondes" /> : (
             <>
               <h2 className="text-lg font-semibold">Rondes de mes sites</h2>
               {rondesFiltrees.length === 0 && <p className="text-muted-foreground text-sm">Aucune ronde configurée sur vos sites.</p>}
-              {rondesFiltrees.map(ronde => (
+              {rondesFiltrees.map((ronde) => (
                 <Card key={ronde.id} className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -458,7 +658,22 @@ export default function EspaceAgent() {
           )}
         </TabsContent>
 
-        {/* ===== MAIN COURANTE ===== */}
+        <TabsContent value="checkpoints" className="space-y-4">
+          {!droits.acces_points_controle ? <AccessDenied label="Points de contrôle" /> : (
+            <>
+              <h2 className="text-lg font-semibold">Points de contrôle de mes sites</h2>
+              {checkpoints.length === 0 && <p className="text-muted-foreground text-sm">Aucun point de contrôle sur vos sites.</p>}
+              {checkpoints.map((cp, i) => (
+                <Card key={`${cp.id || cp.name}-${i}`} className="p-4">
+                  <p className="font-medium">{cp.name}</p>
+                  <p className="text-sm text-muted-foreground">{cp.site_name} • {cp.ronde_name}</p>
+                  {cp.description && <p className="text-xs text-muted-foreground mt-1">{cp.description}</p>}
+                </Card>
+              ))}
+            </>
+          )}
+        </TabsContent>
+
         <TabsContent value="maincourante" className="space-y-4">
           {!droits.acces_main_courante ? <AccessDenied label="Main courante" /> : (
             <>
@@ -470,7 +685,7 @@ export default function EspaceAgent() {
                 <p className="text-muted-foreground text-sm">Aucune entrée pour vos sites.</p>
               ) : (
                 <div className="space-y-3">
-                  {mcFiltered.slice(0, 50).map(entry => (
+                  {mcFiltered.slice(0, 50).map((entry) => (
                     <Card key={entry.id} className={`p-3 ${entry.severity === 'urgent' ? 'border-l-4 border-l-red-500' : entry.severity === 'attention' ? 'border-l-4 border-l-amber-400' : ''}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
@@ -492,7 +707,6 @@ export default function EspaceAgent() {
           )}
         </TabsContent>
 
-        {/* ===== ÉCARTS HORAIRES ===== */}
         <TabsContent value="ecarts" className="space-y-4">
           {!droits.acces_ecarts ? <AccessDenied label="Écarts horaires" /> : (
             <>
@@ -501,11 +715,11 @@ export default function EspaceAgent() {
                 <p className="text-muted-foreground text-sm">Aucun service enregistré.</p>
               ) : (
                 <div className="space-y-3">
-                  {ecarts.slice(0, 20).map(s => {
-                    const mission = missions.find(m => m.id === s.mission_id);
+                  {ecarts.slice(0, 20).map((s) => {
+                    const mission = missions.find((m) => m.id === s.mission_id);
                     const ecartMin = mission && s.actual_start && s.actual_end
-                      ? Math.round((new Date(`2000-01-01T${s.actual_end}`) - new Date(`2000-01-01T${s.actual_start}`)) / 60000) -
-                        Math.round((new Date(`2000-01-01T${mission.end_time}`) - new Date(`2000-01-01T${mission.start_time}`)) / 60000)
+                      ? Math.round((new Date(`2000-01-01T${s.actual_end}`) - new Date(`2000-01-01T${s.actual_start}`)) / 60000)
+                        - Math.round((new Date(`2000-01-01T${mission.end_time}`) - new Date(`2000-01-01T${mission.start_time}`)) / 60000)
                       : null;
                     return (
                       <Card key={s.id} className="p-4">
@@ -529,7 +743,6 @@ export default function EspaceAgent() {
           )}
         </TabsContent>
 
-        {/* ===== CONSIGNES ===== */}
         <TabsContent value="consignes" className="space-y-4">
           {!droits.acces_consignes ? <AccessDenied label="Consignes" /> : (
             <>
@@ -540,16 +753,16 @@ export default function EspaceAgent() {
                 )}
               </div>
               {consignes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucune consigne disponible.</p>
+                <p className="text-sm text-muted-foreground">Aucune consigne sur vos sites.</p>
               ) : (
-                consignes.map(c => {
+                consignes.map((c) => {
                   const cat = CATEGORY_CONFIG[c.category] || CATEGORY_CONFIG.general;
-                  const isNew = newConsignes.some(n => n.id === c.id);
+                  const isNew = newConsignes.some((n) => n.id === c.id);
                   return (
                     <Card
                       key={c.id}
                       className={`p-4 cursor-pointer hover:shadow-md transition-shadow ${c.priority === 'critique' ? 'border-l-4 border-l-red-500' : c.priority === 'importante' ? 'border-l-4 border-l-amber-400' : ''} ${isNew ? 'bg-amber-50/50' : ''}`}
-                      onClick={() => setSelectedConsigne(c)}
+                      onClick={() => { setSelectedConsigne(c); markConsignesRead(); }}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <p className="font-semibold text-sm">{c.title}</p>
@@ -568,13 +781,75 @@ export default function EspaceAgent() {
           )}
         </TabsContent>
 
-        {/* ===== DOCUMENTS ===== */}
+        <TabsContent value="carte">
+          {!droits.acces_carte_pro ? <AccessDenied label="Carte professionnelle" /> : (
+            <Card className="p-6 max-w-lg mx-auto border-2">
+              <div className="flex items-center gap-4 mb-6">
+                {companySettings.logo_url ? (
+                  <img src={companySettings.logo_url} alt="" className="w-16 h-16 object-contain rounded-xl bg-white border p-1" />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center"><Building2 className="w-7 h-7 text-primary" /></div>
+                )}
+                <div>
+                  <p className="font-bold leading-tight">{companySettings.company_name || 'Société de sécurité'}</p>
+                  {companySettings.cnaps_number && <p className="text-xs text-muted-foreground">CNAPS {companySettings.cnaps_number}</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mb-4">
+                {agentFiche?.photo_url ? (
+                  <img src={agentFiche.photo_url} alt="" className="w-20 h-20 rounded-full object-cover border" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center text-xl font-bold">
+                    {(agentFiche?.first_name?.[0] || agentName?.[0] || 'A').toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-lg font-bold">{agentFiche ? `${agentFiche.last_name || ''} ${agentFiche.first_name || ''}`.trim() : agentName}</p>
+                  <p className="text-sm text-muted-foreground">{agentFiche?.fonction || 'Agent de sécurité'}</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm">
+                <p className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Carte pro : <strong>{agentFiche?.card_number || '—'}</strong></p>
+                <p>Validité : <strong>{agentFiche?.card_expiry || '—'}</strong></p>
+                {companySettings.address && <p className="text-muted-foreground">{companySettings.address} {companySettings.postal_code} {companySettings.city}</p>}
+                {companySettings.phone && <p className="flex items-center gap-2"><Phone className="w-4 h-4" />{companySettings.phone}</p>}
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="contact">
+          {!droits.acces_contact_societe ? <AccessDenied label="Contact société" /> : (
+            <Card className="p-6 space-y-3">
+              <h2 className="text-lg font-semibold">Contacter mon agence</h2>
+              <p className="font-bold">{companySettings.company_name || 'Société de sécurité'}</p>
+              {companySettings.address && (
+                <p className="text-sm text-muted-foreground flex items-start gap-2">
+                  <MapPin className="w-4 h-4 mt-0.5" />
+                  {companySettings.address}{companySettings.postal_code ? `, ${companySettings.postal_code}` : ''} {companySettings.city || ''}
+                </p>
+              )}
+              {companySettings.phone && (
+                <a href={`tel:${companySettings.phone}`} className="flex items-center gap-2 text-primary font-medium">
+                  <Phone className="w-4 h-4" /> {companySettings.phone}
+                </a>
+              )}
+              {companySettings.email && (
+                <a href={`mailto:${companySettings.email}`} className="flex items-center gap-2 text-primary font-medium">
+                  <Mail className="w-4 h-4" /> {companySettings.email}
+                </a>
+              )}
+              {companySettings.website && <p className="text-sm text-muted-foreground">{companySettings.website}</p>}
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="documents">
           {!droits.acces_documents ? <AccessDenied label="Documents" /> : (
             <>
               <h2 className="text-lg font-semibold mb-4">Mes documents</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {agentDocs.map(doc => (
+                {agentDocs.map((doc) => (
                   <Card key={doc.id} className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -589,7 +864,7 @@ export default function EspaceAgent() {
                     </div>
                   </Card>
                 ))}
-                {fiches.map(fiche => (
+                {fiches.map((fiche) => (
                   <Card key={fiche.id} className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -610,19 +885,15 @@ export default function EspaceAgent() {
           )}
         </TabsContent>
 
-        {/* ===== DEMANDES ===== */}
         <TabsContent value="demandes">
-          {!droits.acces_conges ? <AccessDenied label="Demandes / Congés" /> : (
+          {!droits.acces_conges ? <AccessDenied label="Demandes à la société" /> : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Mes demandes</h2>
-                <Button size="sm" onClick={() => demandeMut.mutate({
-                  company_id: companyId, from_type: 'agent', from_id: user?.id, from_name: agentName,
-                  subject: 'Nouvelle demande', message: '', priority: 'normale', status: 'nouvelle',
-                })}>+ Nouvelle demande</Button>
+                <h2 className="text-lg font-semibold">Mes demandes à la société</h2>
+                <Button size="sm" onClick={() => setShowDemandeForm(true)}>+ Nouvelle demande</Button>
               </div>
               <div className="space-y-3">
-                {demandes.map(d => (
+                {demandes.map((d) => (
                   <Card key={d.id} className="p-4">
                     <p className="font-medium text-sm">{d.subject}</p>
                     <p className="text-xs text-muted-foreground mt-1">{d.message?.slice(0, 100)}</p>
@@ -642,7 +913,51 @@ export default function EspaceAgent() {
         </TabsContent>
       </Tabs>
 
-      {/* Prise de service dialog */}
+      <Dialog open={showDemandeForm} onOpenChange={setShowDemandeForm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Demande à la société</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Objet</Label>
+              <Input value={demandeForm.subject} onChange={(e) => setDemandeForm((f) => ({ ...f, subject: e.target.value }))} placeholder="Congé, matériel, information…" />
+            </div>
+            <div>
+              <Label>Message</Label>
+              <Textarea rows={4} value={demandeForm.message} onChange={(e) => setDemandeForm((f) => ({ ...f, message: e.target.value }))} />
+            </div>
+            <Button
+              className="w-full"
+              disabled={!demandeForm.subject.trim() || !demandeForm.message.trim() || demandeMut.isPending}
+              onClick={() => demandeMut.mutate({
+                company_id: companyId,
+                from_type: 'agent',
+                from_id: priseAgentId,
+                from_name: agentName,
+                subject: demandeForm.subject.trim(),
+                message: demandeForm.message.trim(),
+                priority: 'normale',
+                status: 'nouvelle',
+              })}
+            >
+              Envoyer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <PtiCheckOverlay
+        open={!!currentService && droits.acces_pti && !showPriseForm && !showFinService && fallPending}
+        fallCancelLeft={fallCancelLeft}
+        onSos={() => {
+          const tel = resolveEmergencyTel(currentClient, currentSite);
+          const dialed = dialNumber(tel);
+          cancelFall();
+          handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`);
+          if (!dialed) toast.error('Aucun numéro d’urgence sur la fiche client.');
+        }}
+        onCancelFall={cancelFall}
+      />
+
       <Dialog open={showPriseForm && !!selectedMission} onOpenChange={() => { setShowPriseForm(false); setSelectedMission(null); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -653,15 +968,33 @@ export default function EspaceAgent() {
             <PriseDeServiceNFC
               mission={selectedMission}
               companyId={companyId}
-              agentId={user?.id}
+              agentId={priseAgentId}
               agentName={agentName}
-              onSuccess={() => { setShowPriseForm(false); setSelectedMission(null); qc.invalidateQueries({ queryKey: ['prises_service'] }); }}
+              onSuccess={() => { setShowPriseForm(false); setSelectedMission(null); qc.invalidateQueries({ queryKey: ['prises_service'] }); requestArm(); }}
             />
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Ronde dialog */}
+      <Dialog open={showFinService && !!currentService} onOpenChange={(open) => { if (!open) setShowFinService(false); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Terminer le service</DialogTitle></DialogHeader>
+          {currentService && (
+            <FinDeServicePhoto
+              service={currentService}
+              companyId={companyId}
+              agentId={priseAgentId}
+              agentName={agentName}
+              onSuccess={() => {
+                setShowFinService(false);
+                qc.invalidateQueries({ queryKey: ['prises_service'] });
+                qc.invalidateQueries({ queryKey: ['alertes'] });
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showRondeDialog && !!selectedRonde} onOpenChange={() => { setShowRondeDialog(false); setSelectedRonde(null); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Ronde en cours</DialogTitle></DialogHeader>
@@ -670,15 +1003,20 @@ export default function EspaceAgent() {
               ronde={selectedRonde}
               currentService={currentService}
               companyId={companyId}
-              agentId={user?.id}
+              agentId={priseAgentId}
               agentName={agentName}
-              onFinish={() => { setShowRondeDialog(false); setSelectedRonde(null); }}
+              onFinish={() => {
+                setShowRondeDialog(false);
+                setSelectedRonde(null);
+                qc.invalidateQueries({ queryKey: ['ronde_execs'] });
+                qc.invalidateQueries({ queryKey: ['mc_service'] });
+                qc.invalidateQueries({ queryKey: ['main_courante'] });
+              }}
             />
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Consigne detail dialog */}
       <Dialog open={!!selectedConsigne} onOpenChange={() => setSelectedConsigne(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
