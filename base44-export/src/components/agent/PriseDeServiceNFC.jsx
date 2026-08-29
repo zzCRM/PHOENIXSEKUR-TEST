@@ -121,7 +121,7 @@ export default function PriseDeServiceNFC({ mission, companyId, agentId, agentNa
       const late = timeCheck.late;
       const mcType = late ? 'debut_service_retard' : 'debut_service';
 
-      await base44.entities.PriseDeService.create({
+      const created = await base44.entities.PriseDeService.create({
         company_id: companyId,
         agent_id: agentId,
         agent_name: agentName,
@@ -155,6 +155,7 @@ export default function PriseDeServiceNFC({ mission, companyId, agentId, agentNa
         agent_id: agentId,
         agent_name: agentName,
         mission_id: mission.id,
+        service_id: created?.id,
         date: today,
         time: now,
         type: late ? 'arrivee' : 'arrivee',

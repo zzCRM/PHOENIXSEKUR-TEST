@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import ServiceChrono from '@/components/agent/ServiceChrono';
+import { isEventForVacation } from '@/lib/vacationFeed';
 
 const EVENT_ICON = {
   debut_service: '🛡️',
@@ -65,25 +66,35 @@ export default function ServiceEnCours({
     enabled: !!companyId,
   });
 
+  const nowHm = format(new Date(), 'HH:mm');
+  const feed = useMemo(() => {
+    const vacation = {
+      ...service,
+      agent_id: service.agent_id || agentId,
+      agent_name: service.agent_name || agentName,
+    };
+    return mc
+      .filter((e) => isEventForVacation(e, vacation, nowHm))
+      .sort((a, b) => `${a.date || ''} ${a.time || ''}`.localeCompare(`${b.date || ''} ${b.time || ''}`));
+  }, [mc, service, agentId, agentName, nowHm]);
+
+  const myExecs = execs.filter((e) => isEventForVacation({
+    ...e,
+    service_id: e.service_id,
+    mission_id: e.mission_id,
+    site_id: e.site_id,
+    date: e.date,
+    time: e.start_time || e.time,
+    agent_id: e.agent_id,
+    agent_name: e.agent_name,
+  }, {
+    ...service,
+    agent_id: service.agent_id || agentId,
+    agent_name: service.agent_name || agentName,
+  }, nowHm));
   const siteRondes = rondes.filter((r) => !service.site_id || r.site_id === service.site_id);
-  const myExecs = execs.filter((e) =>
-    e.date === (service.date || today)
-    && (e.agent_id === agentId || e.agent_name === agentName)
-    && (!service.site_id || e.site_id === service.site_id),
-  );
   const rondesDone = myExecs.filter((e) => e.status === 'terminee' || e.end_time).length;
   const rondesPlanned = siteRondes.length;
-
-  const feed = useMemo(() => {
-    return mc
-      .filter((e) => {
-        if (e.site_id && service.site_id && e.site_id !== service.site_id) return false;
-        if (e.date && e.date.split('T')[0] !== (service.date || today)) return false;
-        if (e.agent_id && agentId && e.agent_id !== agentId && e.agent_name !== agentName) return false;
-        return true;
-      })
-      .sort((a, b) => `${a.date || ''} ${a.time || ''}`.localeCompare(`${b.date || ''} ${b.time || ''}`));
-  }, [mc, service, agentId, agentName, today]);
 
   const overdue = (() => {
     if (!service.planned_end) return false;
@@ -266,9 +277,9 @@ export default function ServiceEnCours({
       </Card>
 
       <Card className="p-4">
-        <h3 className="font-semibold mb-3">Fil d’activité</h3>
+        <h3 className="font-semibold mb-3">Fil d’activité de cette vacation</h3>
         {feed.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune activité enregistrée pour l’instant.</p>
+          <p className="text-sm text-muted-foreground">Aucune activité sur cette vacation pour l’instant.</p>
         ) : (
           <div className="relative pl-6 space-y-4">
             <div className="absolute left-[9px] top-1 bottom-1 w-0.5 bg-emerald-300" />

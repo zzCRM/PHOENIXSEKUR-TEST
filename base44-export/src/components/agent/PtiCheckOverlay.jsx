@@ -24,7 +24,7 @@ export default function PtiCheckOverlay({
           ? 'Chute détectée. Annulez si vous allez bien.'
           : overdue
             ? 'L’agence a été alertée.'
-            : 'Confirmez que vous allez bien.'}
+            : 'Confirmez votre activité.'}
       </p>
       {fallPending && (
         <Button className="w-full max-w-sm h-14 bg-white text-slate-900" onClick={onCancelFall}>Fausse alerte</Button>

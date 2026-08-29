@@ -118,6 +118,7 @@ export default function FinDeServicePhoto({ service, companyId, agentId, agentNa
         agent_id: agentId,
         agent_name: agentName,
         mission_id: service.mission_id,
+        service_id: service.id,
         date: today,
         time: now,
         type: 'depart',

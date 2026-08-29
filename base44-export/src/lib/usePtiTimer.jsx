@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const DEFAULT_INTERVAL_MIN = 15;
+const DEFAULT_INTERVAL_MIN = 30;
 
 function storageKey(serviceId) {
   return `pti_last_ok_${serviceId || 'default'}`;

@@ -251,6 +251,8 @@ export default function EspaceAgent() {
       client_name: currentService.client_name,
       agent_id: user?.id,
       agent_name: agentName,
+      mission_id: currentService.mission_id,
+      service_id: currentService.id,
       date: today,
       time: now,
       type: 'geofence',
@@ -288,6 +290,8 @@ export default function EspaceAgent() {
       client_name: currentService.client_name,
       agent_id: user?.id,
       agent_name: agentName,
+      mission_id: currentService.mission_id,
+      service_id: currentService.id,
       date: today,
       time: now,
       type: 'pti_alerte',
@@ -318,7 +322,7 @@ export default function EspaceAgent() {
   const { timeLabel, overdue, resetTimer, secondsLeft, intervalMinutes } = usePtiTimer({
     active: !!currentService && droits.acces_pti,
     serviceId: currentService?.id,
-    intervalMinutes: 15,
+    intervalMinutes: 30,
     onWarning: () => toast.warning('PTI : confirmez votre présence dans 1 minute'),
     onMissedDeadline: () => {
       if (ptiMissedRef.current) return;
@@ -333,7 +337,7 @@ export default function EspaceAgent() {
     toast.error('Alerte PTI envoyée');
   };
 
-  const { armed: fallArmed, pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
+  const { pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
     active: !!currentService && droits.acces_pti,
     onFallConfirmed: () => {
       handlePtiAlerte('⚠️ ALERTE PTI — chute détectée (smartphone)');
@@ -379,6 +383,7 @@ export default function EspaceAgent() {
       company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
       client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
       date: today, time: now, type: 'pti_ok',
+      mission_id: currentService.mission_id, service_id: currentService.id,
       content: `PTI - Confirmation de présence à ${now}`,
       latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
     });
@@ -632,8 +637,6 @@ export default function EspaceAgent() {
               intervalMinutes={intervalMinutes}
               overdue={overdue}
               siteName={currentService?.site_name}
-              gpsOk={!!position}
-              fallArmed={fallArmed}
               fallPending={fallPending}
               fallCancelLeft={fallCancelLeft}
               onOk={handlePtiCheck}
@@ -984,17 +987,6 @@ export default function EspaceAgent() {
         onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
         onCancelFall={cancelFall}
       />
-
-      {currentService && droits.acces_pti && activeTab !== 'pti' && !showPriseForm && !showFinService && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('pti')}
-          className={`fixed right-3 z-[40] rounded-full shadow-xl px-4 h-12 text-sm font-semibold text-white flex items-center gap-2 ${overdue || secondsLeft <= 60 ? 'bg-red-600 animate-pulse' : 'bg-slate-900'}`}
-          style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}
-        >
-          <Shield className="w-4 h-4" /> PTI {timeLabel}
-        </button>
-      )}
 
       <Dialog open={showPriseForm && !!selectedMission} onOpenChange={() => { setShowPriseForm(false); setSelectedMission(null); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
