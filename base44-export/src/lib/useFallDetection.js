@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isFlatFromBeta, isLossOfVerticality, tiltFromVertical } from '@/lib/fallDetect';
+import { detectBrutalFall, isUprightTilt, magnitude, tiltFromVertical } from '@/lib/fallDetect';
 import { unlockPtiAudio } from '@/lib/ptiAlarm';
 
 const CANCEL_SEC = 20;
-const HOLD_MS = 5000;
+const CONFIRM_MS = 2500;
 
 export async function primePtiOnUserGesture() {
   await requestMotionPermission();
@@ -31,20 +31,14 @@ export function useFallDetection({ active, onFallConfirmed }) {
   const [cancelLeft, setCancelLeft] = useState(CANCEL_SEC);
   const [armNonce, setArmNonce] = useState(0);
   const pendingRef = useRef(false);
-  const lossSinceRef = useRef(null);
+  const brutalAtRef = useRef(null);
   const onFallRef = useRef(onFallConfirmed);
   onFallRef.current = onFallConfirmed;
 
   const cancelFall = useCallback(() => {
     pendingRef.current = false;
-    lossSinceRef.current = null;
+    brutalAtRef.current = null;
     setPending(false);
-    setCancelLeft(CANCEL_SEC);
-  }, []);
-
-  const triggerPreAlarm = useCallback(() => {
-    pendingRef.current = true;
-    setPending(true);
     setCancelLeft(CANCEL_SEC);
   }, []);
 
@@ -62,33 +56,35 @@ export function useFallDetection({ active, onFallConfirmed }) {
     }
 
     let cancelled = false;
-    const noteLoss = (lost) => {
-      if (pendingRef.current) return;
-      if (lost) {
-        if (!lossSinceRef.current) lossSinceRef.current = Date.now();
-        if (Date.now() - lossSinceRef.current >= HOLD_MS) {
-          pendingRef.current = true;
-          setPending(true);
-          setCancelLeft(CANCEL_SEC);
-        }
-      } else {
-        lossSinceRef.current = null;
-      }
-    };
-
-    const motionLost = { current: false };
-    const orientLost = { current: false };
-    const noteCombined = () => noteLoss(motionLost.current || orientLost.current);
+    const samples = [];
 
     const motionHandler = (e) => {
-      const a = e.accelerationIncludingGravity || e.acceleration;
-      if (!a) return;
-      motionLost.current = isLossOfVerticality(tiltFromVertical(a.x, a.y, a.z));
-      noteCombined();
-    };
-    const orientHandler = (e) => {
-      orientLost.current = isFlatFromBeta(e.beta);
-      noteCombined();
+      const g = e.accelerationIncludingGravity || e.acceleration;
+      if (!g) return;
+      const now = Date.now();
+      const lin = e.acceleration ? magnitude(e.acceleration.x, e.acceleration.y, e.acceleration.z) : null;
+      const sample = {
+        t: now,
+        mag: magnitude(g.x, g.y, g.z),
+        linear: lin,
+        tilt: tiltFromVertical(g.x, g.y, g.z),
+      };
+      samples.push(sample);
+      while (samples.length && now - samples[0].t > 1200) samples.shift();
+      if (samples.length > 48) samples.shift();
+      if (pendingRef.current) return;
+
+      if (detectBrutalFall(samples)) {
+        if (!brutalAtRef.current) brutalAtRef.current = now;
+      } else if (isUprightTilt(sample.tilt)) {
+        brutalAtRef.current = null;
+      }
+
+      if (brutalAtRef.current && sample.tilt >= 58 && now - brutalAtRef.current >= CONFIRM_MS) {
+        pendingRef.current = true;
+        setPending(true);
+        setCancelLeft(CANCEL_SEC);
+      }
     };
 
     const start = async () => {
@@ -99,7 +95,6 @@ export function useFallDetection({ active, onFallConfirmed }) {
         return;
       }
       window.addEventListener('devicemotion', motionHandler, { passive: true });
-      window.addEventListener('deviceorientation', orientHandler, { passive: true });
       setArmed(true);
     };
     start();
@@ -107,7 +102,6 @@ export function useFallDetection({ active, onFallConfirmed }) {
     return () => {
       cancelled = true;
       window.removeEventListener('devicemotion', motionHandler);
-      window.removeEventListener('deviceorientation', orientHandler);
       setArmed(false);
     };
   }, [active, armNonce, cancelFall]);
@@ -118,7 +112,7 @@ export function useFallDetection({ active, onFallConfirmed }) {
       setCancelLeft((s) => {
         if (s <= 1) {
           pendingRef.current = false;
-          lossSinceRef.current = null;
+          brutalAtRef.current = null;
           setPending(false);
           onFallRef.current?.();
           return CANCEL_SEC;
@@ -129,5 +123,5 @@ export function useFallDetection({ active, onFallConfirmed }) {
     return () => clearInterval(id);
   }, [pending]);
 
-  return { armed, pending, cancelLeft, cancelFall, requestArm, triggerPreAlarm };
+  return { armed, pending, cancelLeft, cancelFall, requestArm };
 }

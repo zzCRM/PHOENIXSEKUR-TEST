@@ -19,7 +19,6 @@ import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { useGeolocation } from '@/lib/useGeolocation';
 import { useFallDetection } from '@/lib/useFallDetection';
-import PtiModernScreen from '@/components/agent/PtiModernScreen';
 import PtiCheckOverlay from '@/components/agent/PtiCheckOverlay';
 import { toast } from 'sonner';
 import PriseDeServiceNFC from '@/components/agent/PriseDeServiceNFC';
@@ -79,7 +78,8 @@ function MissionCard({ mission, today, trailing }) {
 
 export default function EspaceAgent() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'accueil';
+  const rawTab = searchParams.get('tab') || 'accueil';
+  const activeTab = rawTab === 'pti' ? 'accueil' : rawTab;
   const setActiveTab = (tab) => {
     if (tab === 'accueil') setSearchParams({});
     else setSearchParams({ tab });
@@ -323,7 +323,7 @@ export default function EspaceAgent() {
     toast.error('Alerte PTI envoyée');
   };
 
-  const { armed: ptiArmed, pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm, triggerPreAlarm } = useFallDetection({
+  const { pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
     active: !!currentService && droits.acces_pti,
     onFallConfirmed: () => {
       handlePtiAlerte('⚠️ ALERTE PTI — perte de verticalité');
@@ -420,7 +420,6 @@ export default function EspaceAgent() {
               { value: 'accueil', label: 'Accueil', show: true },
               { value: 'service', label: 'Service', show: droits.acces_services },
               { value: 'nonplanifie', label: 'Non planifié', show: droits.acces_service_non_planifie },
-              { value: 'pti', label: 'DATI / PTI', show: droits.acces_pti },
               { value: 'planning', label: 'Planning', show: droits.acces_planning },
               { value: 'rondes', label: 'Rondes', show: droits.acces_rondes },
               { value: 'checkpoints', label: 'Contrôles', show: droits.acces_points_controle },
@@ -541,14 +540,6 @@ export default function EspaceAgent() {
             />
           </div>
 
-          {currentService && droits.acces_pti && (
-            <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => { requestArm(); setActiveTab('pti'); }}>
-              <div>
-                <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" /> DATI / PTI actif</p>
-                <p className="text-xs text-muted-foreground">Actif depuis la prise de service — perte de verticalité</p>
-              </div>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="service" className="space-y-4">
@@ -613,22 +604,6 @@ export default function EspaceAgent() {
             ) : (
               <ServiceNonPlanifie sites={assignedSites.length ? assignedSites : sites} onStart={openPrise} />
             )
-          )}
-        </TabsContent>
-
-        <TabsContent value="pti">
-          {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
-            <PtiModernScreen
-              active={!!currentService}
-              armed={ptiArmed}
-              siteName={currentService?.site_name}
-              fallPending={fallPending}
-              fallCancelLeft={fallCancelLeft}
-              onSos={() => { cancelFall(); handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`); }}
-              onCancelFall={cancelFall}
-              onArmSensors={requestArm}
-              onTestAlarm={triggerPreAlarm}
-            />
           )}
         </TabsContent>
 

@@ -28,7 +28,6 @@ const agentNavGroups = [
       { icon: ScanLine, label: 'Points de contrôle', shortLabel: 'Contrôles', path: '/espace-agent?tab=checkpoints', droit: 'acces_points_controle' },
       { icon: BookOpen, label: 'Cahier de consignes', shortLabel: 'Consignes', path: '/espace-agent?tab=consignes', droit: 'acces_consignes' },
       { icon: CreditCard, label: 'Ma carte professionnelle', shortLabel: 'Carte pro', path: '/espace-agent?tab=carte', droit: 'acces_carte_pro' },
-      { icon: Shield, label: 'DATI / PTI', path: '/espace-agent?tab=pti', droit: 'acces_pti' },
       { icon: Phone, label: 'Contacter l’agence', shortLabel: 'Agence', path: '/espace-agent?tab=contact', droit: 'acces_contact_societe' },
     ],
   },
