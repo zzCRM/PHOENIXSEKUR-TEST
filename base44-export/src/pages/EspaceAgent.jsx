@@ -18,7 +18,6 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { useGeolocation } from '@/lib/useGeolocation';
-import { usePtiTimer } from '@/lib/usePtiTimer';
 import { useFallDetection } from '@/lib/useFallDetection';
 import PtiModernScreen from '@/components/agent/PtiModernScreen';
 import PtiCheckOverlay from '@/components/agent/PtiCheckOverlay';
@@ -318,20 +317,6 @@ export default function EspaceAgent() {
     qc.invalidateQueries({ queryKey: ['alertes'] });
   }, [currentService, companyId, user, agentName, today, position, mcCreateMut, alerteMut, qc]);
 
-  const ptiMissedRef = useRef(false);
-  const { timeLabel, overdue, resetTimer, secondsLeft, intervalMinutes } = usePtiTimer({
-    active: !!currentService && droits.acces_pti,
-    serviceId: currentService?.id,
-    intervalMinutes: 30,
-    onWarning: () => toast.warning('PTI : confirmez votre présence dans 1 minute'),
-    onMissedDeadline: () => {
-      if (ptiMissedRef.current) return;
-      ptiMissedRef.current = true;
-      triggerPtiAlerte('⚠️ ALERTE PTI automatique — absence de confirmation');
-      toast.error('PTI : alerte automatique déclenchée');
-    },
-  });
-
   const handlePtiAlerte = async (reason) => {
     await triggerPtiAlerte(reason || `⚠️ ALERTE PTI manuelle à ${format(new Date(), 'HH:mm')}`);
     toast.error('Alerte PTI envoyée');
@@ -340,7 +325,7 @@ export default function EspaceAgent() {
   const { pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
     active: !!currentService && droits.acces_pti,
     onFallConfirmed: () => {
-      handlePtiAlerte('⚠️ ALERTE PTI — chute détectée (smartphone)');
+      handlePtiAlerte('⚠️ ALERTE PTI — perte de verticalité');
     },
   });
 
@@ -371,23 +356,6 @@ export default function EspaceAgent() {
   const handleFinService = () => {
     if (!currentService) return;
     setShowFinService(true);
-  };
-
-  const handlePtiCheck = async () => {
-    if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    ptiMissedRef.current = false;
-    resetTimer();
-    cancelFall();
-    await mcCreateMut.mutateAsync({
-      company_id: companyId, site_id: currentService.site_id, site_name: currentService.site_name,
-      client_name: currentService.client_name, agent_id: user?.id, agent_name: agentName,
-      date: today, time: now, type: 'pti_ok',
-      mission_id: currentService.mission_id, service_id: currentService.id,
-      content: `PTI - Confirmation de présence à ${now}`,
-      latitude: position?.latitude, longitude: position?.longitude, severity: 'normal',
-    });
-    toast.success('Présence confirmée');
   };
 
   const startRonde = async (ronde) => {
@@ -565,12 +533,9 @@ export default function EspaceAgent() {
 
           {currentService && droits.acces_pti && (
             <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => setActiveTab('pti')}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" /> DATI / PTI actif</p>
-                  <p className="text-xs text-muted-foreground">Confirmez votre présence toutes les {intervalMinutes} min</p>
-                </div>
-                <span className={`font-mono font-bold ${overdue ? 'text-red-600' : 'text-primary'}`}>{timeLabel}</span>
+              <div>
+                <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" /> DATI / PTI actif</p>
+                <p className="text-xs text-muted-foreground">Perte de verticalité armée — appel d’urgence disponible</p>
               </div>
             </Card>
           )}
@@ -632,14 +597,9 @@ export default function EspaceAgent() {
           {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
             <PtiModernScreen
               active={!!currentService}
-              timeLabel={timeLabel}
-              secondsLeft={secondsLeft}
-              intervalMinutes={intervalMinutes}
-              overdue={overdue}
               siteName={currentService?.site_name}
               fallPending={fallPending}
               fallCancelLeft={fallCancelLeft}
-              onOk={handlePtiCheck}
               onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
               onCancelFall={cancelFall}
               onArmSensors={requestArm}
@@ -978,12 +938,8 @@ export default function EspaceAgent() {
       </Dialog>
 
       <PtiCheckOverlay
-        open={!!currentService && droits.acces_pti && !showPriseForm && !showFinService && (secondsLeft <= 60 || overdue || fallPending)}
-        timeLabel={timeLabel}
-        overdue={overdue}
-        fallPending={fallPending}
+        open={!!currentService && droits.acces_pti && !showPriseForm && !showFinService && fallPending}
         fallCancelLeft={fallCancelLeft}
-        onOk={handlePtiCheck}
         onSos={() => handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`)}
         onCancelFall={cancelFall}
       />

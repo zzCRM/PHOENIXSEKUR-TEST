@@ -1,11 +1,13 @@
-/** Heuristique chute : impact fort puis immobilité (téléphone à plat). */
-export function isFallPattern(magnitudes) {
-  if (!Array.isArray(magnitudes) || magnitudes.length < 8) return false;
-  const recent = magnitudes.slice(-12);
-  const peak = Math.max(...recent);
-  const tail = recent.slice(-4);
-  const still = tail.every((m) => m < 4.5);
-  return peak >= 22 && still;
+/** Angle (degrés) entre l’axe long du téléphone (Y) et la verticale. 0 = debout, 90 = à plat. */
+export function tiltFromVertical(x, y, z) {
+  const mag = magnitude(x, y, z);
+  if (mag < 4) return 0;
+  const cos = Math.min(1, Math.abs(Number(y) || 0) / mag);
+  return (Math.acos(cos) * 180) / Math.PI;
+}
+
+export function isLossOfVerticality(tiltDeg, thresholdDeg = 50) {
+  return Number(tiltDeg) >= thresholdDeg;
 }
 
 export function magnitude(x, y, z) {
