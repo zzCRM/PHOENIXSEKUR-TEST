@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { checkAgentCompliance } from '@/lib/laborLaw';
 import ComplianceAlerts from '@/components/planning/ComplianceAlerts';
+import { expandRecurrenceDates } from '@/lib/recurrenceExpand';
 
 const TABS = [
   { key: 'general', label: 'Général', icon: Info },
@@ -62,9 +63,10 @@ const emptyForm = {
   heure_fin: '',
   agent_id: '',
   agent_name: '',
+  agent_email: '',
   agents_required: 1,
   instructions: '',
-  planifier_visible: false,
+  planifier_visible: true,
 };
 
 export default function AjoutServiceModal({ open, onClose, defaultDate, editMission }) {
@@ -91,6 +93,7 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
         heure_fin: editMission.end_time || '',
         agent_id: editMission.agent_id || '',
         agent_name: editMission.agent_name || '',
+        agent_email: editMission.agent_email || '',
         agents_required: editMission.agents_required || 1,
         instructions: editMission.notes || '',
       });
@@ -120,13 +123,23 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
   });
 
   const createMut = useMutation({
-    mutationFn: (data) => base44.entities.Mission.create({ ...data, company_id: companyId }),
-    onSuccess: () => {
+    mutationFn: async (payloads) => {
+      const list = Array.isArray(payloads) ? payloads : [payloads];
+      const results = [];
+      for (const data of list) {
+        results.push(await base44.entities.Mission.create({ ...data, company_id: companyId }));
+      }
+      return results;
+    },
+    onSuccess: (results) => {
       qc.invalidateQueries({ queryKey: ['missions'] });
       qc.invalidateQueries({ queryKey: ['missions', companyId] });
-      toast.success('Service planifié avec succès');
+      toast.success(results.length > 1
+        ? `${results.length} vacations planifiées`
+        : 'Service planifié avec succès');
       onClose();
     },
+    onError: (e) => toast.error(e.message || 'Impossible de planifier'),
   });
 
   const updateMut = useMutation({
@@ -151,19 +164,28 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
 
   const handleSave = () => {
     if (!form.date) { toast.error('La date du service est requise'); return; }
-    const dur = form.heure_debut && form.heure_fin
-      ? (() => {
-          const [h1, m1] = form.heure_debut.split(':').map(Number);
-          const [h2, m2] = form.heure_fin.split(':').map(Number);
-          let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-          if (diff < 0) diff += 24 * 60;
-          return `(${Math.floor(diff / 60)}h${diff % 60 > 0 ? String(diff % 60).padStart(2, '0') : '00'})`;
-        })()
-      : '';
+    if (form.recurrence && !form.date_fin_recurrence) {
+      toast.error('Indiquez une date de fin de récurrence');
+      return;
+    }
+    if (form.recurrence && !form.recurrence_type) {
+      toast.error('Choisissez un type de récurrence');
+      return;
+    }
     const selectedSiteObj = sites.find(s => s.id === form.site_id);
     const clientId = selectedSiteObj?.client_id || undefined;
     const clientName = selectedSiteObj?.client_name || (clientId ? (clients.find(c => c.id === clientId)?.company_name) : undefined) || undefined;
-    const payload = {
+    const groupId = form.recurrence ? `rec-${Date.now()}` : undefined;
+    const dates = expandRecurrenceDates(form);
+    if (dates.length === 0) {
+      toast.error('Aucune date générée pour cette récurrence');
+      return;
+    }
+    if (dates.length > 200) {
+      toast.error('Trop de dates (max 200). Réduisez la période.');
+      return;
+    }
+    const base = {
       company_id: companyId,
       title: `${form.type_label} - ${form.site_name || 'Sans site'}`,
       type: form.type,
@@ -173,18 +195,22 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
       client_name: clientName,
       agent_id: form.agent_id || undefined,
       agent_name: form.agent_name || undefined,
+      agent_email: form.agent_email || undefined,
       agents_required: Number(form.agents_required) || 1,
-      date: form.date,
       start_time: form.heure_debut,
       end_time: form.heure_fin,
       notes: form.instructions,
       status: 'planifiee',
+      visible_agent: form.planifier_visible !== false,
+      recurrence: !!form.recurrence,
+      recurrence_type: form.recurrence ? form.recurrence_type : undefined,
+      recurrence_group_id: groupId,
     };
     if (editMission) {
-      updateMut.mutate({ id: editMission.id, data: payload });
-    } else {
-      createMut.mutate(payload);
+      updateMut.mutate({ id: editMission.id, data: { ...base, date: form.date } });
+      return;
     }
+    createMut.mutate(dates.map((date) => ({ ...base, date })));
   };
 
   if (!open) return null;
@@ -522,6 +548,11 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
                             </div>
                           )}
                         </div>
+                        {form.date && form.date_fin_recurrence && form.recurrence_type && (
+                          <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                            {expandRecurrenceDates(form).length} vacation(s) seront créées et visibles par l’agent assigné.
+                          </p>
+                        )}
                       </>
                     ) : (
                       <>
@@ -577,6 +608,7 @@ export default function AjoutServiceModal({ open, onClose, defaultDate, editMiss
                     const a = agents.find(x => x.id === v);
                     set('agent_id', v);
                     set('agent_name', a ? `${a.first_name} ${a.last_name}` : '');
+                    set('agent_email', a?.email || '');
                   }}>
                     <SelectTrigger className="rounded-lg"><SelectValue placeholder="Sélectionner un collaborateur" /></SelectTrigger>
                     <SelectContent>

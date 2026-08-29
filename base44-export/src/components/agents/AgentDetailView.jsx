@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { DROITS_AGENT_OPTIONS, mergeAgentDroits } from '@/lib/agentPortal';
 
 const SECTIONS = [
   { id: 'general', label: 'Général' },
@@ -28,16 +29,7 @@ const SECTIONS = [
   { id: 'salaire', label: 'Éléments de salaire' },
 ];
 
-const ACCES_OPTIONS = [
-  { key: 'acces_espace_agent', label: 'Espace Agent', description: 'Accès à l\'espace agent mobile' },
-  { key: 'acces_planning', label: 'Planning', description: 'Consulter son planning de missions' },
-  { key: 'acces_conges', label: 'Congés & Absences', description: 'Faire des demandes de congé' },
-  { key: 'acces_documents', label: 'Documents', description: 'Consulter les documents partagés' },
-  { key: 'acces_fiches_paie', label: 'Fiches de paie', description: 'Télécharger ses fiches de paie' },
-  { key: 'acces_rondes', label: 'Rondes', description: 'Effectuer les rondes de surveillance' },
-  { key: 'acces_pti', label: 'PTI', description: 'Accès au module Protection Travailleur Isolé' },
-  { key: 'acces_main_courante', label: 'Main courante', description: 'Consulter la main courante' },
-];
+const ACCES_OPTIONS = DROITS_AGENT_OPTIONS;
 
 function StarRating({ value, onChange }) {
   return (
@@ -352,8 +344,14 @@ export default function AgentDetailView({ agent, onClose }) {
                       <p className="text-xs text-muted-foreground">{opt.description}</p>
                     </div>
                     <Switch
-                      checked={formData[opt.key] !== false}
-                      onCheckedChange={v => update(opt.key, v)}
+                      checked={mergeAgentDroits(formData)[opt.key] === true}
+                      onCheckedChange={(v) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          [opt.key]: v,
+                          droits_portail: { ...mergeAgentDroits(prev), [opt.key]: v },
+                        }));
+                      }}
                     />
                   </div>
                 ))}
@@ -516,7 +514,13 @@ export default function AgentDetailView({ agent, onClose }) {
                     toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
                     return;
                   }
-                  updateMut.mutate({ ...formData, creer_compte_phoenix: creerComptePhoenix });
+                  const droits_portail = mergeAgentDroits(formData);
+                  updateMut.mutate({
+                    ...formData,
+                    ...droits_portail,
+                    droits_portail,
+                    creer_compte_phoenix: creerComptePhoenix,
+                  });
                 }}
                 disabled={updateMut.isPending}
                 className="w-full sm:w-auto"

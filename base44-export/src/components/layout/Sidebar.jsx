@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Building2, MapPin,
@@ -7,9 +7,32 @@ import {
   Navigation, UserPlus, CalendarDays,
   FileSignature, ClipboardCheck, Clock, ScanLine,
   ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock, Wallet,
+  Calendar, Shield, Bookmark, CreditCard, Phone,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { isFieldAgent, mergeAgentDroits } from '@/lib/agentPortal';
+
+const agentNavGroups = [
+  {
+    label: 'Mon portail',
+    items: [
+      { icon: LayoutDashboard, label: 'Accueil', path: '/espace-agent' },
+      { icon: Calendar, label: 'Mon planning', path: '/espace-agent?tab=planning', droit: 'acces_planning' },
+      { icon: Shield, label: 'Service', path: '/espace-agent?tab=service', droit: 'acces_services' },
+      { icon: Clock, label: 'Service non planifié', shortLabel: 'Non planifié', path: '/espace-agent?tab=nonplanifie', droit: 'acces_service_non_planifie' },
+      { icon: Bookmark, label: 'Demandes à la société', shortLabel: 'Demandes', path: '/espace-agent?tab=demandes', droit: 'acces_conges' },
+      { icon: Route, label: 'Rondes', path: '/espace-agent?tab=rondes', droit: 'acces_rondes' },
+      { icon: ScanLine, label: 'Points de contrôle', shortLabel: 'Contrôles', path: '/espace-agent?tab=checkpoints', droit: 'acces_points_controle' },
+      { icon: BookOpen, label: 'Cahier de consignes', shortLabel: 'Consignes', path: '/espace-agent?tab=consignes', droit: 'acces_consignes' },
+      { icon: CreditCard, label: 'Ma carte professionnelle', shortLabel: 'Carte pro', path: '/espace-agent?tab=carte', droit: 'acces_carte_pro' },
+      { icon: Shield, label: 'PTI', path: '/espace-agent?tab=pti', droit: 'acces_pti' },
+      { icon: Phone, label: 'Contacter l’agence', shortLabel: 'Agence', path: '/espace-agent?tab=contact', droit: 'acces_contact_societe' },
+    ],
+  },
+];
 
 const baseNavGroups = [
   {
@@ -116,7 +139,24 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
   const isPlatformOwner = user?.email === PLATFORM_OWNER_EMAIL;
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperAdminUser = !!user?.superadmin;
+  const isAgent = isFieldAgent(user);
   const isMobileDrawer = !!onMobileClose;
+  const companyId = user?.company_id || user?.companyId;
+  const { data: agentFiche } = useQuery({
+    queryKey: ['ma_fiche_agent', user?.email, companyId],
+    queryFn: async () => {
+      const agents = await base44.entities.Agent.filter({ company_id: companyId });
+      return agents.find((a) => String(a.email || '').toLowerCase() === String(user?.email || '').toLowerCase()) || null;
+    },
+    enabled: isAgent && !!companyId && !!user?.email,
+  });
+  const droits = mergeAgentDroits(agentFiche);
+  const navGroups = isAgent
+    ? agentNavGroups.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.droit || droits[item.droit]),
+    }))
+    : getNavGroups(isPlatformOwner, isAdmin, isSuperAdminUser);
 
   const handleLinkClick = () => {
     onMobileClose?.();
@@ -160,7 +200,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
 
       {/* Navigation — scrollable */}
       <nav className="flex-1 min-h-0 py-2 px-2 space-y-3 overflow-y-auto overscroll-contain">
-        {getNavGroups(isPlatformOwner, isAdmin, isSuperAdminUser).map((group) => (
+        {navGroups.map((group) => (
           <div key={group.label}>
             {(!collapsed || isMobileDrawer) && (
               <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40">
@@ -169,8 +209,15 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = location.pathname === item.path
-                  || (item.path !== '/' && location.pathname.startsWith(item.path));
+                const itemUrl = new URL(item.path, 'https://app.local');
+                const itemTab = itemUrl.searchParams.get('tab');
+                const currentTab = new URLSearchParams(location.search).get('tab');
+                const isActive = item.path === '/espace-agent'
+                  ? location.pathname === '/espace-agent' && !currentTab
+                  : itemTab
+                    ? location.pathname === '/espace-agent' && currentTab === itemTab
+                    : location.pathname === item.path
+                      || (item.path !== '/' && location.pathname.startsWith(item.path));
                 return (
                   <Link
                     key={item.path}

@@ -11,35 +11,15 @@ import { CheckCircle2, Info, Lock, Shield } from 'lucide-react';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { DEFAULT_DROITS_AGENT, DROITS_AGENT_OPTIONS, mergeAgentDroits } from '@/lib/agentPortal';
 
 const ROLE_OPTIONS = [
   { value: 'agent', label: 'Agent', description: 'Accès espace collaborateur' },
   { value: 'superviseur', label: 'Superviseur', description: 'Accès collaborateur + supervision équipe' },
 ];
 
-const DROITS_AGENT = [
-  { key: 'acces_planning', label: 'Planning', description: 'Voir son planning et ses vacations à venir' },
-  { key: 'acces_services', label: 'Services / Pointage', description: 'Pointer les débuts et fins de service' },
-  { key: 'acces_ecarts', label: 'Écarts horaires', description: 'Consulter ses écarts horaires' },
-  { key: 'acces_rondes', label: 'Rondes', description: 'Effectuer des rondes sur ses sites' },
-  { key: 'acces_main_courante', label: 'Main courante', description: 'Consulter et saisir la main courante du site' },
-  { key: 'acces_pti', label: 'PTI', description: 'Accès au module Protection Travailleur Isolé' },
-  { key: 'acces_conges', label: 'Demandes RH / Congés', description: 'Soumettre des demandes de congés et RH' },
-  { key: 'acces_documents', label: 'Documents', description: 'Consulter ses documents personnels et fiches de paie' },
-  { key: 'acces_consignes', label: 'Cahier de consignes', description: 'Lire les consignes des sites' },
-];
-
-const DEFAULT_DROITS = {
-  acces_planning: true,
-  acces_services: true,
-  acces_ecarts: false,
-  acces_rondes: true,
-  acces_main_courante: false,
-  acces_pti: true,
-  acces_conges: true,
-  acces_documents: true,
-  acces_consignes: true,
-};
+const DROITS_AGENT = DROITS_AGENT_OPTIONS;
+const DEFAULT_DROITS = DEFAULT_DROITS_AGENT;
 
 export default function AgentForm({ open, onClose, onSubmit, agent }) {
   const [tab, setTab] = useState('infos');
@@ -57,7 +37,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
     if (agent) {
       setForm({ ...agent, hourly_rate: agent.hourly_rate || '' });
       setAgentRole(agent.role || 'agent');
-      setDroits({ ...DEFAULT_DROITS, ...agent.droits_portail });
+      setDroits(mergeAgentDroits(agent));
       setCreerComptePhoenix(false);
     } else {
       setForm({ first_name: '', last_name: '', email: '', phone: '', card_number: '', card_expiry: '', status: 'actif', address: '', hire_date: '', hourly_rate: '', notes: '', role: 'agent' });
@@ -79,6 +59,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
     }
     onSubmit({
       ...form,
+      ...droits,
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : undefined,
       role: agentRole,
       droits_portail: droits,

@@ -7,11 +7,13 @@ import RGPDConsent from '@/components/rgpd/RGPDConsent';
 import { Menu, Search, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/AuthContext';
+import { isFieldAgent } from '@/lib/agentPortal';
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout, user } = useAuth();
+  const agentPortal = isFieldAgent(user);
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -68,7 +70,9 @@ export default function AppLayout() {
               />
 
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate leading-tight">Phoenix Sekur</p>
+                <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+                  {agentPortal ? 'Espace Agent' : 'Phoenix Sekur'}
+                </p>
                 {user?.email && (
                   <p className="text-[11px] text-gray-500 truncate leading-tight">{user.email}</p>
                 )}
@@ -109,7 +113,7 @@ export default function AppLayout() {
           </button>
         </div>
 
-        <CompanyHeader />
+        {!agentPortal && <CompanyHeader />}
 
         <main className="p-3 sm:p-4 xl:p-8 max-w-[100vw] overflow-x-hidden">
           <Outlet />
