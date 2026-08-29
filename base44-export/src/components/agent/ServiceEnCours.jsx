@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import ServiceChrono from '@/components/agent/ServiceChrono';
 import { isEventForVacation } from '@/lib/vacationFeed';
 import { isServiceOverdue } from '@/lib/serviceStartRules';
+import { RUN_STATUS_META, vacationRunStatus } from '@/lib/vacationStatus';
+import ServiceActionBar from '@/components/agent/ServiceActionBar';
 
 const EVENT_ICON = {
   debut_service: '🛡️',
@@ -51,6 +53,7 @@ export default function ServiceEnCours({
   agentName,
   onStartRonde,
   onFinService,
+  site,
 }) {
   const qc = useQueryClient();
   const [showRondeDetail, setShowRondeDetail] = useState(false);
@@ -107,6 +110,7 @@ export default function ServiceEnCours({
 
   const overdue = isServiceOverdue(service, new Date(tick));
   const needsProlongation = overdue && !service.prolongation_motif;
+  const runStatus = vacationRunStatus(service);
 
   const writeMc = async (type, content, extra = {}) => {
     const now = format(new Date(), 'HH:mm');
@@ -202,9 +206,10 @@ export default function ServiceEnCours({
     <div className="space-y-4">
       <Card className="p-4 space-y-3 cursor-default">
         <div className="flex flex-wrap gap-2">
-          <Badge className="bg-emerald-500 text-white">Planifié</Badge>
+          {!service.unplanned && <Badge className="bg-emerald-500 text-white">Planifié</Badge>}
+          <Badge className={RUN_STATUS_META[runStatus].className}>{RUN_STATUS_META[runStatus].label}</Badge>
           {needsProlongation && <Badge className="bg-amber-400 text-amber-950">Heure de fin dépassée</Badge>}
-          {overdue && service.prolongation_motif && <Badge className="bg-amber-400 text-amber-950">Prolongation déclarée</Badge>}
+          {overdue && service.prolongation_motif && <Badge className="bg-amber-400 text-amber-950">Prolongation</Badge>}
           {onPause && <Badge className="bg-amber-500 text-white">En pause</Badge>}
         </div>
         <p className="text-sm text-muted-foreground">
@@ -227,6 +232,41 @@ export default function ServiceEnCours({
             Terminer
           </Button>
         </div>
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h3 className="font-semibold">Actions terrain</h3>
+        <ServiceActionBar
+          site={site}
+          service={service}
+          companyId={companyId}
+          agentId={agentId}
+          agentName={agentName}
+          onCreateEvent={async (payload) => {
+            await writeMc(payload.event_type || payload.type, payload.content, {
+              severity: payload.severity,
+              category: payload.category,
+              event_type: payload.event_type,
+              type: payload.type,
+            });
+            if (payload.alert) {
+              await base44.entities.Alerte.create({
+                company_id: companyId,
+                type: payload.alert_type || payload.event_type,
+                agent_id: agentId,
+                agent_name: agentName,
+                site_id: service.site_id,
+                site_name: service.site_name,
+                client_name: service.client_name,
+                message: payload.alert_message || payload.content,
+                date: payload.date,
+                time: payload.time,
+                severity: payload.severity || 'urgent',
+              });
+              qc.invalidateQueries({ queryKey: ['alertes'] });
+            }
+          }}
+        />
       </Card>
 
       {needsProlongation && (

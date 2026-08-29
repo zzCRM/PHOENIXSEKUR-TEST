@@ -5,6 +5,11 @@ import { unlockPtiAudio } from '@/lib/ptiAlarm';
 const CANCEL_SEC = 20;
 const HOLD_MS = 5000;
 
+export async function primePtiOnUserGesture() {
+  await requestMotionPermission();
+  await unlockPtiAudio();
+}
+
 async function requestMotionPermission() {
   try {
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {

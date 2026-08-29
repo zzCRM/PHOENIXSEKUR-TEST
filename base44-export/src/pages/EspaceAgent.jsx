@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpan
 import { mergeAgentDroits, assignedSiteIds, accountDisplayName } from '@/lib/agentPortal';
 import PlanningMapView from '@/components/planning/PlanningMapView';
 import { canStartPlannedService, isServiceOverdue } from '@/lib/serviceStartRules';
+import { RUN_STATUS_META, vacationRunStatus } from '@/lib/vacationStatus';
 
 const CATEGORY_CONFIG = {
   general: { label: 'Général', color: 'bg-gray-100 text-gray-700' },
@@ -329,6 +330,10 @@ export default function EspaceAgent() {
     },
   });
 
+  useEffect(() => {
+    if (currentService && droits.acces_pti) requestArm();
+  }, [currentService?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const agentSiteIds = siteIdSet;
   const mcFiltered = mainCouranteData.filter((mc) => agentSiteIds.includes(mc.site_id));
   const rondesFiltrees = rondes.filter((r) => agentSiteIds.includes(r.site_id));
@@ -540,7 +545,7 @@ export default function EspaceAgent() {
             <Card className="p-4 border-primary/30 cursor-pointer" onClick={() => { requestArm(); setActiveTab('pti'); }}>
               <div>
                 <p className="font-semibold flex items-center gap-2"><Shield className="w-4 h-4" /> DATI / PTI actif</p>
-                <p className="text-xs text-muted-foreground">Perte de verticalité armée — appel d’urgence disponible</p>
+                <p className="text-xs text-muted-foreground">Actif depuis la prise de service — perte de verticalité</p>
               </div>
             </Card>
           )}
@@ -548,45 +553,52 @@ export default function EspaceAgent() {
 
         <TabsContent value="service" className="space-y-4">
           {!droits.acces_services ? <AccessDenied label="Services" /> : (
-            currentService ? (
-              <ServiceEnCours
-                service={currentService}
-                mission={myMissions.find((m) => m.id === currentService.mission_id) || todayMissions[0]}
-                rondes={rondesFiltrees}
-                companyId={companyId}
-                agentId={priseAgentId}
-                agentName={agentName}
-                onStartRonde={startRonde}
-                onFinService={handleFinService}
-              />
-            ) : (
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Vacations du jour</h2>
-                {todayMissions.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Aucune vacation assignée aujourd'hui.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {todayMissions.map((m) => (
-                      <div key={m.id} className="flex items-center justify-between p-4 border border-border rounded-xl">
-                        <div>
-                          <p className="font-medium">{m.title}</p>
-                          <p className="text-sm text-muted-foreground">{m.site_name} • {m.start_time} - {m.end_time}</p>
-                        </div>
-                        <Button onClick={() => openPrise(m)} className="gap-2" disabled={!canStartPlannedService(m).ok}>
-                          <Clock className="w-4 h-4" /> {
-                            canStartPlannedService(m).ok
-                              ? 'Prendre le service'
-                              : canStartPlannedService(m).tooLate
-                                ? 'Hors horaires'
-                                : `Dès ${m.start_time}`
-                          }
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+            <>
+              {currentService && (
+                <ServiceEnCours
+                  service={currentService}
+                  mission={myMissions.find((m) => m.id === currentService.mission_id) || todayMissions[0]}
+                  site={currentSite}
+                  rondes={rondesFiltrees}
+                  companyId={companyId}
+                  agentId={priseAgentId}
+                  agentName={agentName}
+                  onStartRonde={startRonde}
+                  onFinService={handleFinService}
+                />
+              )}
+              <div className="space-y-3">
+                {!currentService && <h2 className="text-lg font-semibold">Vacations du jour</h2>}
+                {currentService && todayMissions.some((m) => m.id !== currentService.mission_id) && (
+                  <h3 className="text-sm font-semibold text-muted-foreground">Autres vacations du jour</h3>
                 )}
-              </Card>
-            )
+                {todayMissions.length === 0 && !currentService && (
+                  <p className="text-muted-foreground text-sm">Aucune vacation assignée aujourd'hui.</p>
+                )}
+                {todayMissions.filter((m) => !currentService || m.id !== currentService.mission_id).map((m) => {
+                  const prise = services.find((s) => s.mission_id === m.id);
+                  const status = vacationRunStatus(prise);
+                  const meta = RUN_STATUS_META[status];
+                  const check = canStartPlannedService(m);
+                  return (
+                    <Card key={m.id} className="p-4 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className="bg-emerald-500 text-white">Planifié</Badge>
+                        <Badge className={meta.className}>{meta.label}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">Le {format(new Date(`${normalizeDateKey(m.date)}T12:00:00`), 'dd/MM/yyyy')} de {m.start_time} à {m.end_time}</p>
+                      <p className="font-bold">{m.site_name}</p>
+                      {m.site_address && <p className="text-sm text-muted-foreground">{m.site_address}</p>}
+                      {status === 'en_attente' && !currentService && (
+                        <Button onClick={() => openPrise(m)} className="gap-2" disabled={!check.ok}>
+                          <Clock className="w-4 h-4" /> {check.ok ? 'Prendre le service' : check.tooLate ? 'Hors horaires' : `Dès ${m.start_time}`}
+                        </Button>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </>
           )}
         </TabsContent>
 

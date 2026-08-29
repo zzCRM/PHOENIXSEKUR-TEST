@@ -19,7 +19,7 @@ export default function PtiModernScreen({
       <div className="rounded-2xl border p-6 text-center space-y-2">
         <Shield className="w-10 h-10 mx-auto text-primary" />
         <h2 className="text-lg font-bold">Protection du travailleur isolé</h2>
-        <p className="text-sm text-muted-foreground">Le PTI s’active à la prise de service : perte de verticalité, alerte sonore, appel d’urgence et sortie de périmètre.</p>
+        <p className="text-sm text-muted-foreground">Le PTI s’active automatiquement à la prise de service : perte de verticalité, alerte sonore et sortie de périmètre.</p>
       </div>
     );
   }
@@ -28,19 +28,10 @@ export default function PtiModernScreen({
     <div className={cn('rounded-2xl border p-5 space-y-4', fallPending && 'border-red-500 bg-red-50')}>
       <div>
         <h2 className="text-lg font-bold">PTI — {siteName}</h2>
-        <p className="text-xs text-muted-foreground">Perte de verticalité + appel d’urgence</p>
+        <p className="text-xs text-emerald-700 font-medium">Actif depuis la prise de service</p>
       </div>
 
-      {!armed ? (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground text-center">
-            Autorisez le mouvement et le son une fois (obligatoire sur iPhone). Posez ensuite le téléphone à plat 5 secondes.
-          </p>
-          <Button type="button" className="w-full h-14" onClick={onArmSensors}>
-            Activer le PTI (capteurs + son)
-          </Button>
-        </div>
-      ) : fallPending ? (
+      {fallPending ? (
         <>
           <p className="text-5xl font-mono font-bold text-center text-red-600">
             00:{String(fallCancelLeft).padStart(2, '0')}
@@ -54,8 +45,14 @@ export default function PtiModernScreen({
         </>
       ) : (
         <div className="space-y-2 text-center">
-          <p className="text-sm font-medium text-emerald-700">PTI armé — perte de verticalité surveillée</p>
-          <p className="text-xs text-muted-foreground">Posez le téléphone à plat 5 secondes : bip + question « ça va / secours ».</p>
+          <p className="text-sm font-medium text-emerald-700">
+            {armed ? 'Capteurs armés — perte de verticalité surveillée' : 'PTI actif — armement des capteurs en cours'}
+          </p>
+          {!armed && (
+            <Button type="button" variant="outline" className="w-full" onClick={onArmSensors}>
+              Autoriser les capteurs (iPhone)
+            </Button>
+          )}
           <Button type="button" variant="outline" className="w-full" onClick={onTestAlarm}>
             Tester l’alerte sonore
           </Button>

@@ -12,6 +12,7 @@ import {
   nfcMatches,
   isWithinSiteGeofence,
 } from '@/lib/serviceStartRules';
+import { primePtiOnUserGesture } from '@/lib/useFallDetection';
 
 export default function PriseDeServiceNFC({ mission, companyId, agentId, agentName, onSuccess }) {
   const [step, setStep] = useState('camera');
@@ -111,6 +112,7 @@ export default function PriseDeServiceNFC({ mission, companyId, agentId, agentNa
     if (blocked) { setGateError(blocked); return; }
     setLoading(true);
     setGateError('');
+    primePtiOnUserGesture();
 
     try {
       const photoFile = new File([photoBlob], `service_${Date.now()}.jpg`, { type: 'image/jpeg' });
