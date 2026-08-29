@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { announcePtiPreAlarm, startPtiAlarm, stopPtiAlarm } from '@/lib/ptiAlarm';
+import { startPtiAlarm, stopPtiAlarm } from '@/lib/ptiAlarm';
 
 export default function PtiCheckOverlay({
   open,
@@ -12,7 +12,6 @@ export default function PtiCheckOverlay({
   useEffect(() => {
     if (!open) return undefined;
     startPtiAlarm();
-    announcePtiPreAlarm();
     return () => stopPtiAlarm();
   }, [open]);
 

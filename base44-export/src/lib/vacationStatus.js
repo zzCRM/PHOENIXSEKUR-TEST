@@ -12,10 +12,24 @@ export const RUN_STATUS_META = {
   termine: { label: 'Terminé', className: 'bg-slate-600 text-white' },
 };
 
-export function siteEmergencyNumber(site) {
-  const raw = site?.urgences?.[0];
-  if (!raw) return '';
-  const text = typeof raw === 'string' ? raw : (raw.tel || raw.phone || raw.numero || raw.label || '');
+export function extractPhone(value) {
+  if (value == null || value === '') return '';
+  const text = typeof value === 'string'
+    ? value
+    : (value.urgence_phone || value.tel || value.phone || value.numero || value.label || '');
   const m = String(text).match(/(\+?\d[\d\s./-]{6,}\d)/);
-  return (m ? m[1] : String(text)).replace(/[^\d+]/g, '');
+  return (m ? m[1] : '').replace(/[^\d+]/g, '');
+}
+
+export function siteEmergencyNumber(site) {
+  return extractPhone(site?.urgences?.[0]);
+}
+
+/** Numéro d’urgence de la fiche client (champ dédié, sinon téléphone). */
+export function clientEmergencyNumber(client) {
+  return extractPhone(client?.urgence_phone) || extractPhone(client?.phone);
+}
+
+export function resolveEmergencyTel(client, site) {
+  return clientEmergencyNumber(client) || siteEmergencyNumber(site);
 }

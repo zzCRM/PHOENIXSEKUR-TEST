@@ -68,7 +68,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
   const clientSites = client ? sites.filter(s => s.client_id === client.id) : [];
 
   const [form, setForm] = useState({
-    company_name: '', contact_name: '', email: '', phone: '',
+    company_name: '', contact_name: '', email: '', phone: '', urgence_phone: '',
     address: '', city: '', postal_code: '', country: 'FRANCE',
     status: 'actif', notes: '',
     legal_form: '', siret: '', tva_number: '', siren: '', director_name: '',
@@ -86,7 +86,7 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
       setPortalDroits(client.portal_droits || {});
       setPortalNotifs(client.portal_notifs || {});
     } else {
-      setForm({ company_name: '', contact_name: '', email: '', phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
+      setForm({ company_name: '', contact_name: '', email: '', phone: '', urgence_phone: '', address: '', city: '', postal_code: '', country: 'FRANCE', status: 'actif', notes: '', legal_form: '', siret: '', tva_number: '', siren: '', director_name: '', payment_delay: '', payment_days: '', iban: '', bic: '', identifier: '' });
       setPortalPerms({ ...DEFAULT_PORTAL_PERMS });
       setCompteClients([{ email: '', role: 'client', has_account: false, invite_sent: false, first_name: '', last_name: '', phone: '', fonction: '' }]);
       setPortalDroits({});
@@ -192,6 +192,10 @@ export default function ClientForm({ open, onClose, onSubmit, client }) {
                   <div className="space-y-1.5">
                     <Label>Téléphone</Label>
                     <Input value={form.phone} onChange={e => update('phone', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Numéro d’urgence</Label>
+                    <Input value={form.urgence_phone || ''} onChange={e => update('urgence_phone', e.target.value)} placeholder="Composé par l’agent en cas d’alerte PTI" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Email</Label>

@@ -31,7 +31,8 @@ import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpan
 import { mergeAgentDroits, assignedSiteIds, accountDisplayName } from '@/lib/agentPortal';
 import PlanningMapView from '@/components/planning/PlanningMapView';
 import { canStartPlannedService, isServiceOverdue } from '@/lib/serviceStartRules';
-import { RUN_STATUS_META, vacationRunStatus } from '@/lib/vacationStatus';
+import { RUN_STATUS_META, resolveEmergencyTel, vacationRunStatus } from '@/lib/vacationStatus';
+import { dialNumber } from '@/lib/ptiAlarm';
 
 const CATEGORY_CONFIG = {
   general: { label: 'Général', color: 'bg-gray-100 text-gray-700' },
@@ -209,6 +210,12 @@ export default function EspaceAgent() {
     queryKey: ['site_geofence', currentService?.site_id],
     queryFn: () => base44.entities.Site.get(currentService.site_id),
     enabled: !!currentService?.site_id,
+  });
+  const clientId = currentSite?.client_id || currentService?.client_id;
+  const { data: currentClient } = useQuery({
+    queryKey: ['client_urgence', clientId],
+    queryFn: () => base44.entities.Client.get(clientId),
+    enabled: !!clientId,
   });
 
   const mcCreateMut = useMutation({ mutationFn: (data) => base44.entities.MainCourante.create(data) });
@@ -550,6 +557,7 @@ export default function EspaceAgent() {
                   service={currentService}
                   mission={myMissions.find((m) => m.id === currentService.mission_id) || todayMissions[0]}
                   site={currentSite}
+                  client={currentClient}
                   rondes={rondesFiltrees}
                   companyId={companyId}
                   agentId={priseAgentId}
@@ -940,7 +948,13 @@ export default function EspaceAgent() {
       <PtiCheckOverlay
         open={!!currentService && droits.acces_pti && !showPriseForm && !showFinService && fallPending}
         fallCancelLeft={fallCancelLeft}
-        onSos={() => { cancelFall(); handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`); }}
+        onSos={() => {
+          const tel = resolveEmergencyTel(currentClient, currentSite);
+          const dialed = dialNumber(tel);
+          cancelFall();
+          handlePtiAlerte(`⚠️ ALERTE PTI SOS à ${format(new Date(), 'HH:mm')}`);
+          if (!dialed) toast.error('Aucun numéro d’urgence sur la fiche client.');
+        }}
         onCancelFall={cancelFall}
       />
 

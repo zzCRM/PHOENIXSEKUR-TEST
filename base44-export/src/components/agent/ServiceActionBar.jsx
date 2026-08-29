@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { EVENT_TYPES, getEventMeta, CATEGORY_LEGACY_TYPE } from '@/lib/mainCouranteEvents';
-import { siteEmergencyNumber } from '@/lib/vacationStatus';
+import { resolveEmergencyTel } from '@/lib/vacationStatus';
+import { dialNumber } from '@/lib/ptiAlarm';
 import { useTorch } from '@/lib/useTorch';
 import { format } from 'date-fns';
 
@@ -23,6 +24,7 @@ const QUICK = [
 
 export default function ServiceActionBar({
   site,
+  client,
   service,
   companyId,
   agentId,
@@ -34,7 +36,7 @@ export default function ServiceActionBar({
   const [note, setNote] = useState('');
   const [eventType, setEventType] = useState('');
 
-  const tel = siteEmergencyNumber(site);
+  const tel = resolveEmergencyTel(client, site);
   const types = open?.category ? (EVENT_TYPES[open.category] || []).filter((e) => !e.auto) : [];
 
   const startQuick = (item, preset) => {
@@ -91,10 +93,10 @@ export default function ServiceActionBar({
 
   const callUrgence = () => {
     if (!tel) {
-      toast.error('Aucun contact d’urgence n’est renseigné sur ce site (paramètres du site → Urgence).');
+      toast.error('Aucun numéro d’urgence sur la fiche client.');
       return;
     }
-    window.location.href = `tel:${tel}`;
+    dialNumber(tel);
   };
 
   return (

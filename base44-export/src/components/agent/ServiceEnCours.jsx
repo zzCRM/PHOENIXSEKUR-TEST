@@ -54,6 +54,7 @@ export default function ServiceEnCours({
   onStartRonde,
   onFinService,
   site,
+  client,
 }) {
   const qc = useQueryClient();
   const [showRondeDetail, setShowRondeDetail] = useState(false);
@@ -238,6 +239,7 @@ export default function ServiceEnCours({
         <h3 className="font-semibold">Actions terrain</h3>
         <ServiceActionBar
           site={site}
+          client={client}
           service={service}
           companyId={companyId}
           agentId={agentId}

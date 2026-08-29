@@ -22,6 +22,10 @@
     "phone": {
       "type": "string"
     },
+    "urgence_phone": {
+      "type": "string",
+      "description": "Numéro d’urgence de la fiche client, composé par l’agent (PTI / bouton Urgence)"
+    },
     "address": {
       "type": "string"
     },
