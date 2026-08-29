@@ -1,18 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Search, Plus, CalendarDays, Download, FileText, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Plus, CalendarDays, Download, FileText, LayoutGrid } from 'lucide-react';
+import MonthPlanningHome from '@/components/planning/MonthPlanningHome';
+import PlanningVacationSheet from '@/components/planning/PlanningVacationSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
-  addMonths, subMonths, getDay, isToday
+  addMonths, subMonths, getDay, isToday, isSameMonth,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import AjoutServiceModal from '@/components/planning/AjoutServiceModal';
 import { buildJoursFeriesMap } from '@/lib/joursFeries';
-import { qualifyService, serviceDurationHours } from '@/lib/serviceQualification';
+import { serviceDurationHours } from '@/lib/serviceQualification';
 import { exportPlanningPdf } from '@/lib/planningPdfExport';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/lib/useCompany';
@@ -27,58 +29,18 @@ const STATUS_COLORS = {
   annulee: 'bg-gray-400',
 };
 
-const BUCKET_STYLES = {
-  jour: 'bg-emerald-500',
-  nuit: 'bg-indigo-500',
-  dimanche: 'bg-amber-500',
-  ferie: 'bg-red-500',
-};
-
 function getDayOfWeekLabel(date) {
   return ['D', 'L', 'M', 'M', 'J', 'V', 'S'][getDay(date)];
-}
-
-/* ---------- Tooltip de vacation au survol ---------- */
-function VacationTooltip({ missions, date, feriesMap, onClose }) {
-  if (!missions || missions.length === 0) return null;
-  const q = qualifyService(date, missions[0].start_time, missions[0].end_time, feriesMap);
-  return (
-    <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-gray-800 text-white rounded-lg shadow-xl p-3 text-xs pointer-events-auto">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold text-sm">{format(date, 'EEEE d MMM', { locale: fr })}</span>
-        <button onClick={onClose} className="text-white/60 hover:text-white"><X className="w-3.5 h-3.5" /></button>
-      </div>
-      <div className="space-y-2">
-        {missions.map((m, i) => (
-          <div key={i} className="border-t border-white/10 pt-2 first:border-0 first:pt-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className={cn('w-2 h-2 rounded-full', STATUS_COLORS[m.status] || 'bg-emerald-500')} />
-              <span className="font-medium">{m.start_time} - {m.end_time}</span>
-              <span className="text-white/60 text-[10px]">({serviceDurationHours(m.start_time, m.end_time).toFixed(1)}h)</span>
-            </div>
-            <div className="text-white/90">{m.agent_name || 'Non assigné'}</div>
-            <div className="text-white/60 text-[11px]">{m.site_name || '—'} • {m.client_name || '—'}</div>
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-white/10">
-        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium text-white', BUCKET_STYLES[q.bucket])}>
-          {q.label}
-        </span>
-        {q.isFerie && <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-600 text-white">Férié</span>}
-        {q.isSunday && !q.isFerie && <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-600 text-white">Dimanche</span>}
-        {q.isNight && <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-600 text-white">Nuit</span>}
-      </div>
-    </div>
-  );
 }
 
 export default function PlanningAvance() {
   const { companyId, isAdmin } = useCompany();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(new Date());
+  const [view, setView] = useState('calendrier');
   const [search, setSearch] = useState('');
   const [showAjoutService, setShowAjoutService] = useState(false);
-  const [hoveredCell, setHoveredCell] = useState(null); // { rowKey, dateKey }
+  const [sheet, setSheet] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
 
   const monthStart = startOfMonth(currentDate);
@@ -94,7 +56,7 @@ export default function PlanningAvance() {
 
   const { data: missions = [] } = useQuery({
     queryKey: ['missions', companyId],
-    queryFn: () => base44.entities.Mission.filter({ company_id: companyId }, '-date', 500),
+    queryFn: () => base44.entities.Mission.filter({ company_id: companyId }, '-date', 800),
     enabled: !!companyId,
   });
   const { data: companySettings } = useQuery({
@@ -107,6 +69,11 @@ export default function PlanningAvance() {
   const { data: clients = [] } = useQuery({
     queryKey: ['clients', companyId],
     queryFn: () => base44.entities.Client.filter({ company_id: companyId }),
+    enabled: !!companyId,
+  });
+  const { data: sites = [] } = useQuery({
+    queryKey: ['sites', companyId],
+    queryFn: () => base44.entities.Site.filter({ company_id: companyId }),
     enabled: !!companyId,
   });
   const qc = useQueryClient();
@@ -161,12 +128,24 @@ export default function PlanningAvance() {
     return map;
   }, [missions, monthStart, monthEnd]);
 
+  const filteredMissions = useMemo(() => {
+    if (!search) return missions;
+    const s = search.toLowerCase();
+    return missions.filter((m) =>
+      [m.client_name, m.site_name, m.agent_name, m.title].some((v) => String(v || '').toLowerCase().includes(s)));
+  }, [missions, search]);
+
   const filteredGroups = useMemo(() => {
     if (!search) return grouped;
     const s = search.toLowerCase();
     const result = {};
     Object.entries(grouped).forEach(([key, group]) => {
-      if (group.client_name.toLowerCase().includes(s)) result[key] = group;
+      const clientHit = group.client_name.toLowerCase().includes(s);
+      const sites = {};
+      Object.entries(group.sites).forEach(([sk, site]) => {
+        if (clientHit || String(site.site_name || '').toLowerCase().includes(s)) sites[sk] = site;
+      });
+      if (Object.keys(sites).length) result[key] = { ...group, sites };
     });
     return result;
   }, [grouped, search]);
@@ -178,6 +157,12 @@ export default function PlanningAvance() {
       .map(d => ({ date: d, name: feriesMap[format(d, 'yyyy-MM-dd')] }))
       .filter(d => d.name);
   }, [visibleDays, feriesMap]);
+
+  useEffect(() => {
+    if (!isSameMonth(selectedDay, currentDate)) {
+      setSelectedDay(isSameMonth(new Date(), currentDate) ? new Date() : startOfMonth(currentDate));
+    }
+  }, [currentDate]);
 
   const handleExport = async (mode) => {
     if (missions.length === 0) { toast.error('Aucune mission à exporter'); return; }
@@ -228,72 +213,104 @@ export default function PlanningAvance() {
         navigate('/facturation');
       }
       qc.invalidateQueries({ queryKey: ['missions'] });
+      setSheet(null);
     } catch (e) {
       toast.error('Échec : ' + (e.message || ''));
     }
   };
 
+  const goToday = () => {
+    const now = new Date();
+    setCurrentDate(now);
+    setSelectedDay(now);
+  };
+
   return (
-    <div className="space-y-5 relative">
+    <div className="space-y-4 relative">
       <AjoutServiceModal
         open={showAjoutService}
         onClose={() => { setShowAjoutService(false); setEditMission(null); }}
-        defaultDate={format(currentDate, 'yyyy-MM-dd')}
+        defaultDate={format(selectedDay, 'yyyy-MM-dd')}
         editMission={editMission}
       />
 
-      {/* En-tête moderne */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-              <CalendarDays className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight capitalize">{format(currentDate, 'MMMM yyyy', { locale: fr })}</h1>
-              <p className="text-sm text-muted-foreground">Planning par site et poste — survolez une vacation pour le détail</p>
-            </div>
+      <PlanningVacationSheet
+        open={!!sheet}
+        onClose={() => setSheet(null)}
+        missions={sheet?.missions || []}
+        date={sheet?.date}
+        feriesMap={feriesMap}
+        onAction={(action, list) => handleContextAction(action, list)}
+      />
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight capitalize">
+              {format(currentDate, 'MMMM yyyy', { locale: fr })}
+            </h1>
+            <p className="text-sm text-muted-foreground">Touchez un jour, puis une vacation</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Rechercher client..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 w-44 h-9" />
-            </div>
-            <div className="flex items-center bg-white border rounded-lg shadow-sm overflow-hidden">
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" className="h-9 px-3 rounded-none text-sm font-medium" onClick={() => setCurrentDate(new Date())}>
-                Aujourd'hui
-              </Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
+          <Button onClick={() => setShowAjoutService(true)} className="gap-1.5 h-10 shrink-0">
+            <Plus className="w-4 h-4" /> Ajouter
+          </Button>
+        </div>
 
-            {/* Export PDF */}
-            <div className="relative">
-              <Button variant="outline" className="h-9 gap-2" onClick={() => setExportOpen(v => !v)}>
-                <Download className="w-4 h-4" /> Export PDF
-              </Button>
-              {exportOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded-lg shadow-lg w-56 py-1">
-                    <button onClick={() => handleExport('site')} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
-                      <FileText className="w-4 h-4" /> Par site (paysage A4)
-                    </button>
-                    <button onClick={() => handleExport('collaborateur')} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
-                      <FileText className="w-4 h-4" /> Par collaborateur (paysage A4)
-                    </button>
-                  </div>
-                </>
+        <div className="flex items-center gap-2 overflow-x-auto tabs-scroll pb-0.5">
+          <div className="flex rounded-xl border border-border bg-muted/40 p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setView('calendrier')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium',
+                view === 'calendrier' ? 'bg-background shadow-sm' : 'text-muted-foreground',
               )}
-            </div>
-
-            <Button onClick={() => setShowAjoutService(true)} className="bg-primary hover:bg-primary/90 gap-2 font-semibold h-9">
-              <Plus className="w-4 h-4" /> Ajouter
+            >
+              <CalendarDays className="w-4 h-4" /> Calendrier
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('grille')}
+              className={cn(
+                'hidden xl:inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium',
+                view === 'grille' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+              )}
+            >
+              <LayoutGrid className="w-4 h-4" /> Tableau
+            </button>
+          </div>
+          <div className="flex items-center border rounded-xl bg-card overflow-hidden shrink-0">
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+              <ChevronLeft className="w-4 h-4" />
             </Button>
+            <Button variant="ghost" className="h-9 px-2 rounded-none text-sm" onClick={goToday}>
+              Aujourd'hui
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="relative min-w-[9rem] flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input placeholder="Site, agent, client…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 rounded-xl" />
+          </div>
+          <div className="relative shrink-0">
+            <Button variant="outline" className="h-9 gap-2 rounded-xl" onClick={() => setExportOpen((v) => !v)}>
+              <Download className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span>
+            </Button>
+            {exportOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded-lg shadow-lg w-56 py-1">
+                  <button type="button" onClick={() => handleExport('site')} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Par site
+                  </button>
+                  <button type="button" onClick={() => handleExport('collaborateur')} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Par collaborateur
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -313,8 +330,25 @@ export default function PlanningAvance() {
         )}
       </div>
 
-      {/* Tableau */}
-      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+      {view === 'calendrier' && (
+        <MonthPlanningHome
+          title="Vacations du mois"
+          missions={filteredMissions}
+          prises={prises}
+          sites={sites}
+          month={currentDate}
+          onMonthChange={setCurrentDate}
+          selected={selectedDay}
+          onSelect={setSelectedDay}
+          feriesMap={feriesMap}
+          hideMonthNav
+          onAdd={() => setShowAjoutService(true)}
+          onOpenMission={(m) => setSheet({ missions: [m], date: selectedDay })}
+        />
+      )}
+
+      {view === 'grille' && (
+      <div className="hidden xl:block overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="text-xs border-collapse w-full">
           <thead>
             <tr className="bg-muted/60">
@@ -411,17 +445,14 @@ export default function PlanningAvance() {
                           const assigned = dayMissions.length;
                           const required = Math.max(1, ...dayMissions.map(m => m.agents_required || 1));
                           const hasRetard = dayMissions.some(m => retardByMissionId[m.id]);
-                          const isHovered = hoveredCell && hoveredCell.rowKey === `${siteKey}-${rowLabel}` && hoveredCell.dateKey === dateKey;
                           return (
                             <td
                               key={i}
                               className={cn(
                                 "border-b border-r border-border text-center relative",
                                 ferie ? 'bg-red-50' : isWeekend ? 'bg-muted/10' : '',
-                                isHovered && 'ring-2 ring-primary ring-inset'
                               )}
-                              onMouseEnter={() => assigned > 0 && setHoveredCell({ rowKey: `${siteKey}-${rowLabel}`, dateKey, missions: dayMissions, date: day })}
-                              onMouseLeave={() => setHoveredCell(null)}
+                              onClick={() => assigned > 0 && setSheet({ missions: dayMissions, date: day })}
                               onContextMenu={(e) => {
                                 if (assigned > 0) {
                                   e.preventDefault();
@@ -451,14 +482,6 @@ export default function PlanningAvance() {
                                   </div>
                                 </div>
                               )}
-                              {isHovered && assigned > 0 && (
-                                <VacationTooltip
-                                  missions={hoveredCell.missions}
-                                  date={hoveredCell.date}
-                                  feriesMap={feriesMap}
-                                  onClose={() => setHoveredCell(null)}
-                                />
-                              )}
                             </td>
                           );
                         })}
@@ -471,6 +494,7 @@ export default function PlanningAvance() {
           </tbody>
         </table>
       </div>
+      )}
 
       {contextMenu && (
         <PlanningContextMenu
@@ -481,8 +505,8 @@ export default function PlanningAvance() {
         />
       )}
 
-      {/* Légende */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      {view === 'grille' && (
+      <div className="hidden xl:flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">Cellule :</span>
         <div className="flex items-center gap-1.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold">1</span><span className="w-px h-3 bg-gray-300" /><span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold">1</span><span>assignés / requis</span></div>
         <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded-sm bg-emerald-500" /><span>Planifiée</span></div>
@@ -492,6 +516,7 @@ export default function PlanningAvance() {
         <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded-sm bg-red-100 border border-red-300" /><span>Jour férié</span></div>
         <div className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white shadow">!</span><span>Prise de service en retard</span></div>
       </div>
+      )}
 
     </div>
   );

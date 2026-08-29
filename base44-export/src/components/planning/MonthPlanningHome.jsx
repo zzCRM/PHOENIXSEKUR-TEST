@@ -24,10 +24,30 @@ export default function MonthPlanningHome({
   title = 'Planning du mois',
   onOpenMission,
   currentService,
+  month: monthProp,
+  onMonthChange,
+  selected: selectedProp,
+  onSelect,
+  onAdd,
+  feriesMap = {},
+  counts = true,
+  hideMonthNav = false,
 }) {
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const [selected, setSelected] = useState(() => new Date());
+  const [monthState, setMonthState] = useState(() => startOfMonth(monthProp || new Date()));
+  const [selectedState, setSelectedState] = useState(() => selectedProp || new Date());
   const [calendarOpen, setCalendarOpen] = useState(true);
+  const month = monthProp ? startOfMonth(monthProp) : monthState;
+  const selected = selectedProp || selectedState;
+
+  const setMonth = (updater) => {
+    const next = typeof updater === 'function' ? updater(month) : updater;
+    onMonthChange?.(next);
+    if (!monthProp) setMonthState(startOfMonth(next));
+  };
+  const setSelected = (day) => {
+    onSelect?.(day);
+    if (!selectedProp) setSelectedState(day);
+  };
 
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
@@ -38,15 +58,14 @@ export default function MonthPlanningHome({
   const selectedList = useMemo(() => dayMissions(missions, selected)
     .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || ''))), [missions, selected]);
 
-  const daysWithEvents = useMemo(() => {
-    const set = new Set();
+  const countByDay = useMemo(() => {
+    const map = {};
     missions.forEach((m) => {
       const k = normalizeDateKey(m.date);
-      if (k && m.status !== 'annulee') set.add(k);
+      if (k && m.status !== 'annulee') map[k] = (map[k] || 0) + 1;
     });
-    return set;
+    return map;
   }, [missions]);
-
   const priseByMission = useMemo(() => {
     const map = {};
     prises.forEach((p) => {
@@ -62,6 +81,7 @@ export default function MonthPlanningHome({
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2.5 border-b">
         <h2 className="font-semibold text-sm sm:text-base">{title}</h2>
+        {!hideMonthNav && (
         <div className="flex items-center gap-1">
           <button type="button" className="p-2 rounded-lg hover:bg-muted" onClick={() => setMonth((d) => subMonths(d, 1))} aria-label="Mois précédent">
             <ChevronLeft className="w-4 h-4" />
@@ -73,6 +93,7 @@ export default function MonthPlanningHome({
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+        )}
       </div>
 
       {calendarOpen && (
@@ -87,22 +108,33 @@ export default function MonthPlanningHome({
               const key = format(day, 'yyyy-MM-dd');
               const inMonth = isSameMonth(day, month);
               const selectedDay = isSameDay(day, selected);
-              const has = daysWithEvents.has(key);
+              const n = countByDay[key] || 0;
+              const ferie = feriesMap[key];
               return (
                 <button
                   key={key}
                   type="button"
                   onClick={() => { setSelected(day); }}
                   className={cn(
-                    'relative h-10 sm:h-11 rounded-full text-sm flex flex-col items-center justify-center',
+                    'relative h-11 sm:h-12 rounded-2xl text-sm flex flex-col items-center justify-center',
                     !inMonth && 'text-muted-foreground/40',
-                    selectedDay && 'bg-slate-700 text-white',
+                    selectedDay && 'bg-slate-800 text-white shadow-sm',
                     !selectedDay && isToday(day) && 'ring-1 ring-primary',
-                    !selectedDay && inMonth && 'hover:bg-muted',
+                    !selectedDay && inMonth && !ferie && 'hover:bg-muted',
+                    !selectedDay && ferie && inMonth && 'bg-red-50 text-red-700',
                   )}
                 >
                   {format(day, 'd')}
-                  {has && (
+                  {n > 0 && counts && (
+                    <span className={cn(
+                      'text-[9px] font-semibold leading-none mt-0.5',
+                      selectedDay ? 'text-amber-200' : 'text-amber-600',
+                    )}
+                    >
+                      {n}
+                    </span>
+                  )}
+                  {n > 0 && !counts && (
                     <span className={cn('absolute bottom-1 w-1.5 h-1.5 rounded-full', selectedDay ? 'bg-amber-300' : 'bg-amber-500')} />
                   )}
                 </button>
@@ -121,11 +153,19 @@ export default function MonthPlanningHome({
       </button>
 
       <div className="px-3 pb-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Services</h3>
-          <p className="text-xs text-muted-foreground capitalize">
-            {format(selected, 'EEEE d MMMM', { locale: fr })}
-          </p>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="font-semibold">Services</h3>
+            <p className="text-xs text-muted-foreground capitalize">
+              {format(selected, 'EEEE d MMMM', { locale: fr })}
+              {feriesMap[format(selected, 'yyyy-MM-dd')] ? ` — ${feriesMap[format(selected, 'yyyy-MM-dd')]}` : ''}
+            </p>
+          </div>
+          {onAdd && (
+            <Button type="button" size="sm" className="gap-1 h-8" onClick={() => onAdd(selected)}>
+              Ajouter
+            </Button>
+          )}
         </div>
         {selectedList.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">Aucune vacation ce jour.</p>
