@@ -192,7 +192,7 @@ export default function EspaceAgent() {
   const futureMissions = myMissions.filter((m) => normalizeDateKey(m.date) >= today);
   const siteIdSet = assignedSiteIds({ missions: myMissions, sites, agentId: agentFiche?.id });
   const assignedSites = sites.filter((s) => siteIdSet.includes(s.id));
-  const consignes = consignesRaw.filter((c) => !c.site_id || siteIdSet.includes(c.site_id) || siteIdSet.length === 0);
+  const consignes = consignesRaw.filter((c) => !c.site_id || siteIdSet.includes(c.site_id));
   const currentService = services.find((s) => {
     if (normalizeDateKey(s.date) !== today || s.status !== 'en_service') return false;
     if (s.agent_id && (s.agent_id === user?.id || s.agent_id === agentFiche?.id)) return true;
