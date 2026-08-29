@@ -14,6 +14,7 @@ export default function RondeNFC({ ronde, currentService, companyId, agentId, ag
   const [notes, setNotes] = useState({});
   const [loading, setLoading] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [startedAt] = useState(() => format(new Date(), 'HH:mm'));
   const [scanningFor, setScanningFor] = useState(null); // cpId en cours de scan
   const [scanError, setScanError] = useState('');
 
@@ -87,7 +88,7 @@ export default function RondeNFC({ ronde, currentService, companyId, agentId, ag
       agent_name: agentName,
       mission_id: currentService?.mission_id || '',
       date: today,
-      start_time: now,
+      start_time: startedAt,
       end_time: now,
       status: isComplete ? 'terminee' : 'incomplete',
       checkpoints_done: checkpointsDone,
@@ -106,7 +107,8 @@ export default function RondeNFC({ ronde, currentService, companyId, agentId, ag
       agent_name: agentName,
       date: today,
       time: now,
-      type: 'ronde',
+      type: 'fin_ronde',
+      event_type: 'fin_ronde',
       content: mainCouranteContent,
       severity: hasAnomalies ? 'attention' : 'normal',
     });

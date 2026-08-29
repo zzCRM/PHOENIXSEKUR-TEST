@@ -71,7 +71,8 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
   const normalize = (s) => ({
     name: '', client_id: '', client_name: '', type: 'gardiennage', status: 'actif',
     address: '', address_complement: '', city: '', postal_code: '', country: 'FRANCE',
-    latitude: null, longitude: null, photo_url: '', instructions: '', nfc_tag_id: '', geofence_radius: 200,
+    latitude: null, longitude: null, photo_url: '', instructions: '', nfc_tag_id: '', nfc_tag_fin_id: '',
+    geofence_radius: 200, prise_service_mode: 'geolocalisation', pointage_arrivee: false, pointage_depart: false,
     specialites: [], agent_ids: [], pieces_jointes: [], urgences: [], checkpoints_service: [],
     cles: [], alarmes: [], consignes_droits: {}, parametres_envoi: {},
     company_id: companyId || '',
@@ -344,7 +345,7 @@ export default function SiteFormModal({ open, onClose, onSubmit, site, clients =
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium">Rayon de géofence (mètres)</Label>
                     <Input type="number" value={form.geofence_radius ?? 200} onChange={e => update('geofence_radius', parseInt(e.target.value) || 200)} />
-                    <p className="text-xs text-muted-foreground">Rayon de contrôle géofence autour du site pour la prise de service.</p>
+                    <p className="text-xs text-muted-foreground">Si le mode de prise de service est « Géolocalisation », l’agent ne peut pointer qu’à l’intérieur de ce rayon.</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">

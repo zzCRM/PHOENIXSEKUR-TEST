@@ -25,8 +25,10 @@ import FinDeServicePhoto from '@/components/agent/FinDeServicePhoto';
 import RondeNFC from '@/components/agent/RondeNFC';
 import ServiceChrono from '@/components/agent/ServiceChrono';
 import ServiceNonPlanifie from '@/components/agent/ServiceNonPlanifie';
+import ServiceEnCours from '@/components/agent/ServiceEnCours';
 import { normalizeDateKey, isMissionVisibleToAgent } from '@/lib/recurrenceExpand';
 import { mergeAgentDroits, assignedSiteIds } from '@/lib/agentPortal';
+import { canStartPlannedService } from '@/lib/serviceStartRules';
 
 const CATEGORY_CONFIG = {
   general: { label: 'Général', color: 'bg-gray-100 text-gray-700' },
@@ -376,17 +378,39 @@ export default function EspaceAgent() {
   const startRonde = async (ronde) => {
     const now = format(new Date(), 'HH:mm');
     await alerteMut.mutateAsync({
-      company_id: companyId, type: 'debut_ronde', agent_id: user?.id, agent_name: agentName,
+      company_id: companyId, type: 'debut_ronde', agent_id: priseAgentId, agent_name: agentName,
       site_id: ronde.site_id, site_name: ronde.site_name,
       message: `${agentName} a démarré la ronde "${ronde.name}" sur ${ronde.site_name} à ${now}`,
       date: today, time: now, severity: 'info',
     });
+    await mcCreateMut.mutateAsync({
+      company_id: companyId,
+      site_id: ronde.site_id,
+      site_name: ronde.site_name,
+      client_name: currentService?.client_name,
+      agent_id: priseAgentId,
+      agent_name: agentName,
+      mission_id: currentService?.mission_id,
+      service_id: currentService?.id,
+      date: today,
+      time: now,
+      type: 'debut_ronde',
+      event_type: 'debut_ronde',
+      content: `Début de ronde « ${ronde.name} » à ${now} — ${agentName}`,
+      severity: 'normal',
+    });
     qc.invalidateQueries({ queryKey: ['alertes'] });
+    qc.invalidateQueries({ queryKey: ['mc_service'] });
     setSelectedRonde(ronde);
     setShowRondeDialog(true);
   };
 
   const openPrise = (mission) => {
+    const check = canStartPlannedService(mission);
+    if (!check.ok) {
+      toast.error(check.reason);
+      return;
+    }
     setSelectedMission(mission);
     setShowPriseForm(true);
   };
@@ -479,23 +503,24 @@ export default function EspaceAgent() {
           )}
 
           {currentService && (
-            <Card className="p-5 border-2 border-green-400 bg-green-50">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-                    <span className="font-semibold text-green-700">En service</span>
+            <button type="button" className="w-full text-left" onClick={() => setActiveTab('service')}>
+              <Card className="p-5 border-2 border-green-400 bg-green-50">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                      <span className="font-semibold text-green-700">En service — ouvrir le détail</span>
+                    </div>
+                    <p className="font-bold text-lg">{currentService.site_name}</p>
+                    <p className="text-sm text-muted-foreground">Prise de service à {currentService.actual_start}</p>
                   </div>
-                  <p className="font-bold text-lg">{currentService.site_name}</p>
-                  <p className="text-sm text-muted-foreground">Prise de service à {currentService.actual_start}</p>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground mb-1">Temps écoulé</p>
+                    <ServiceChrono service={currentService} className="text-green-800" />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground mb-1">Temps écoulé</p>
-                  <ServiceChrono service={currentService} className="text-green-800" />
-                </div>
-              </div>
-              {droits.acces_services && <Button variant="destructive" size="sm" className="mt-3" onClick={handleFinService}>Terminer (photo + GPS)</Button>}
-            </Card>
+              </Card>
+            </button>
           )}
 
           {droits.acces_planning && (
@@ -514,8 +539,8 @@ export default function EspaceAgent() {
                         </p>
                       </div>
                       {droits.acces_services && normalizeDateKey(m.date) === today && !currentService && (
-                        <Button size="sm" onClick={() => openPrise(m)} className="gap-1.5 shrink-0">
-                          <Clock className="w-3.5 h-3.5" /> Prendre le service
+                        <Button size="sm" onClick={() => openPrise(m)} className="gap-1.5 shrink-0" disabled={!canStartPlannedService(m).ok}>
+                          <Clock className="w-3.5 h-3.5" /> {canStartPlannedService(m).ok ? 'Prendre le service' : `Dès ${m.start_time}`}
                         </Button>
                       )}
                     </div>
@@ -529,25 +554,16 @@ export default function EspaceAgent() {
         <TabsContent value="service" className="space-y-4">
           {!droits.acces_services ? <AccessDenied label="Services" /> : (
             currentService ? (
-              <Card className="p-6 border-2 border-primary/40 bg-primary/5">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                  <h2 className="text-lg font-semibold text-green-600">En service actuellement</h2>
-                </div>
-                <p className="font-bold text-xl">{currentService.site_name}</p>
-                <p className="text-muted-foreground">{currentService.client_name}</p>
-                <div className="mt-4 p-4 rounded-xl bg-white border">
-                  <p className="text-xs text-muted-foreground mb-1">Chrono depuis la prise de service</p>
-                  <ServiceChrono service={currentService} />
-                </div>
-                <div className="mt-3 space-y-1 text-sm">
-                  <p>Arrivée : <strong>{currentService.actual_start}</strong></p>
-                  <p>Fin prévue : <strong>{currentService.planned_end || '—'}</strong></p>
-                  {position && <p className="flex items-center gap-1 text-xs text-muted-foreground mt-2"><Navigation className="w-3 h-3 text-green-500" /> GPS actif</p>}
-                </div>
-                {currentService.start_photo_url && <img src={currentService.start_photo_url} alt="Photo service" className="mt-3 w-24 h-24 rounded-xl object-cover border" />}
-                <Button variant="destructive" className="mt-4" onClick={handleFinService}>Terminer le service</Button>
-              </Card>
+              <ServiceEnCours
+                service={currentService}
+                mission={myMissions.find((m) => m.id === currentService.mission_id) || todayMissions[0]}
+                rondes={rondesFiltrees}
+                companyId={companyId}
+                agentId={priseAgentId}
+                agentName={agentName}
+                onStartRonde={startRonde}
+                onFinService={handleFinService}
+              />
             ) : (
               <Card className="p-6">
                 <h2 className="text-lg font-semibold mb-4">Vacations du jour</h2>
@@ -561,8 +577,8 @@ export default function EspaceAgent() {
                           <p className="font-medium">{m.title}</p>
                           <p className="text-sm text-muted-foreground">{m.site_name} • {m.start_time} - {m.end_time}</p>
                         </div>
-                        <Button onClick={() => openPrise(m)} className="gap-2">
-                          <Clock className="w-4 h-4" /> Prendre le service
+                        <Button onClick={() => openPrise(m)} className="gap-2" disabled={!canStartPlannedService(m).ok}>
+                          <Clock className="w-4 h-4" /> {canStartPlannedService(m).ok ? 'Prendre le service' : `Dès ${m.start_time}`}
                         </Button>
                       </div>
                     ))}
@@ -996,7 +1012,13 @@ export default function EspaceAgent() {
               companyId={companyId}
               agentId={priseAgentId}
               agentName={agentName}
-              onFinish={() => { setShowRondeDialog(false); setSelectedRonde(null); }}
+              onFinish={() => {
+                setShowRondeDialog(false);
+                setSelectedRonde(null);
+                qc.invalidateQueries({ queryKey: ['ronde_execs'] });
+                qc.invalidateQueries({ queryKey: ['mc_service'] });
+                qc.invalidateQueries({ queryKey: ['main_courante'] });
+              }}
             />
           )}
         </DialogContent>
