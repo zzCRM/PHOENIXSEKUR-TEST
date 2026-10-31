@@ -7,10 +7,12 @@ import {
   matchesFilter,
   generateId,
   sortRecords,
+  prisma,
 } from '../lib/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
 import { PLATFORM_COMPANY_ID, isPlatformCompanyId } from '../lib/tenant.js';
+import { buildScope, canRead, canWrite, presentRecord } from '../lib/access.js';
 
 const router = Router();
 
@@ -27,6 +29,40 @@ function assertCanAccessRow(req, row) {
   if (!row) return false;
   if (isSuperAdmin(req.user)) return true;
   return row.companyId && row.companyId === req.user.companyId;
+}
+
+async function scopeFor(req) {
+  if (!req.user || isSuperAdmin(req.user) || req.user.role === 'admin' || req.user.role === 'supervisor') {
+    return { ficheAgent: null, ficheClient: null, siteIds: new Set() };
+  }
+  const companyId = req.user.companyId;
+  const [agents, clients, sites] = await Promise.all([
+    getEntityDelegate('Agent').findMany({ where: { companyId } }),
+    getEntityDelegate('Client').findMany({ where: { companyId } }),
+    getEntityDelegate('Site').findMany({ where: { companyId } }),
+  ]);
+  return buildScope(req.user, {
+    agents: agents.map(toApiRecord),
+    clients: clients.map(toApiRecord),
+    sites: sites.map(toApiRecord),
+  });
+}
+
+async function recordAudit(req, action, entity, entityId, companyId) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        companyId: companyId || req.user?.companyId || 'unknown',
+        userId: req.user?.sub || null,
+        email: req.user?.email || null,
+        action,
+        entity,
+        entityId: entityId || null,
+      },
+    });
+  } catch {
+    // Migration non appliquée : l'opération métier n'est pas bloquée.
+  }
 }
 
 router.get('/:entityName', async (req, res) => {
@@ -74,6 +110,10 @@ router.get('/:entityName', async (req, res) => {
     }
 
     records = sortRecords(records, sort || '-created_date');
+    const scope = await scopeFor(req);
+    records = records
+      .filter((record) => canRead(req.user, entityName, record, scope))
+      .map((record) => presentRecord(req.user, entityName, record));
 
     const skipN = skip ? parseInt(skip, 10) : 0;
     const takeN = limit ? parseInt(limit, 10) : undefined;
@@ -92,10 +132,12 @@ router.get('/:entityName/:id', async (req, res) => {
     const { entityName, id } = req.params;
     const delegate = getEntityDelegate(entityName);
     const row = await delegate.findUnique({ where: { id } });
-    if (!row || !assertCanAccessRow(req, row)) {
+    const record = row ? toApiRecord(row) : null;
+    const scope = await scopeFor(req);
+    if (!row || !assertCanAccessRow(req, row) || !canRead(req.user, entityName, record, scope)) {
       return res.status(404).json({ error: 'Not found' });
     }
-    res.json(toApiRecord(row));
+    res.json(presentRecord(req.user, entityName, record));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -117,6 +159,12 @@ router.post('/:entityName', async (req, res) => {
       return res.status(400).json({ error: 'Société requise' });
     }
 
+    const preview = { ...parsed.data, id, company_id: companyId };
+    const scope = await scopeFor(req);
+    if (!canWrite(req.user, entityName, preview, 'create', scope)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
     const row = await delegate.create({
       data: {
         id,
@@ -128,6 +176,7 @@ router.post('/:entityName', async (req, res) => {
       },
     });
 
+    await recordAudit(req, 'create', entityName, row.id, companyId);
     res.status(201).json(toApiRecord(row));
   } catch (err) {
     console.error('Entity create error:', err);
@@ -142,7 +191,8 @@ router.put('/:entityName/:id', async (req, res) => {
     const parsed = splitIncomingRecord({ ...req.body, id });
 
     const existing = await delegate.findUnique({ where: { id } });
-    if (!existing || !assertCanAccessRow(req, existing)) {
+    const scope = await scopeFor(req);
+    if (!existing || !assertCanAccessRow(req, existing) || !canRead(req.user, entityName, toApiRecord(existing), scope)) {
       return res.status(404).json({ error: 'Not found' });
     }
 
@@ -155,6 +205,10 @@ router.put('/:entityName/:id', async (req, res) => {
     const nextCompanyId = isSuperAdmin(req.user)
       ? (parsed.companyId ?? existing.companyId)
       : existing.companyId;
+    const nextRecord = { ...mergedData, id, company_id: nextCompanyId };
+    if (!canWrite(req.user, entityName, nextRecord, 'update', scope)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
 
     const row = await delegate.update({
       where: { id },
@@ -167,6 +221,7 @@ router.put('/:entityName/:id', async (req, res) => {
       },
     });
 
+    await recordAudit(req, 'update', entityName, row.id, nextCompanyId);
     res.json(toApiRecord(row));
   } catch (err) {
     console.error('Entity update error:', err);
@@ -179,10 +234,16 @@ router.delete('/:entityName/:id', async (req, res) => {
     const { entityName, id } = req.params;
     const delegate = getEntityDelegate(entityName);
     const existing = await delegate.findUnique({ where: { id } });
-    if (!existing || !assertCanAccessRow(req, existing)) {
+    const scope = await scopeFor(req);
+    const record = existing ? toApiRecord(existing) : null;
+    if (!existing || !assertCanAccessRow(req, existing) || !canRead(req.user, entityName, record, scope)) {
       return res.status(404).json({ error: 'Not found' });
     }
+    if (!canWrite(req.user, entityName, record, 'delete', scope)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
     await delegate.delete({ where: { id } });
+    await recordAudit(req, 'delete', entityName, id, existing.companyId);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

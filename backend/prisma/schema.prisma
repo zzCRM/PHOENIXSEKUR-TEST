@@ -423,3 +423,17 @@ model AppUser {
   @@index([companyId])
   @@map("app_users")
 }
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  userId    String?  @map("user_id")
+  email     String?
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@map("audit_logs")
+}

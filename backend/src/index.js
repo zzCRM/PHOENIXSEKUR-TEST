@@ -45,15 +45,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(authMiddleware);
 
 // Fichiers uploadés (logos, photos, documents)
-app.use('/uploads', express.static(join(__dirname, '../uploads')));
+app.use('/uploads', (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+  next();
+}, express.static(join(__dirname, '../uploads')));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'phoenixsekur-api', version: '1.1.0' });
 });
 
-app.get('/api/config/google-maps-key', (_req, res) => {
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  if (!key) return res.json({ apiKey: '', data: { apiKey: '' } });
+app.get('/api/config/google-maps-key', (req, res) => {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+  const key = process.env.GOOGLE_MAPS_BROWSER_KEY || '';
   res.json({ apiKey: key, data: { apiKey: key } });
 });
 

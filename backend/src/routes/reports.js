@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { sendReportEmail } from '../lib/report-email.js';
 import { getEntityDelegate } from '../lib/prisma.js';
 import { runScheduledReports } from '../lib/report-scheduler.js';
+import { escapeHtml, reportCompanyId } from '../lib/access.js';
 
 const router = Router();
 
@@ -27,6 +28,9 @@ router.post('/send-email', requireAuth, async (req, res) => {
     if (recipients.length === 0) {
       return res.status(400).json({ error: 'Destinataire email requis' });
     }
+    if (!reportCompanyId(req.user, req.body?.company_id)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
 
     const results = [];
     for (const email of recipients) {
@@ -38,8 +42,8 @@ router.post('/send-email', requireAuth, async (req, res) => {
         modules,
         stats: stats || {},
         // Sujet/corps custom optionnels ; sinon modèle Super Admin « report_client »
-        subject: subject || undefined,
-        text: body || undefined,
+        subject: subject ? escapeHtml(subject) : undefined,
+        text: body ? escapeHtml(body) : undefined,
         pdfBase64,
         filename,
       });
@@ -85,9 +89,13 @@ router.post('/send-email', requireAuth, async (req, res) => {
 /** Déclenche manuellement le job d'envoi auto (test depuis Paramètres). */
 router.post('/run-scheduled', requireAuth, async (req, res) => {
   try {
+    const companyId = reportCompanyId(req.user, req.body?.company_id);
+    if (!companyId) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
     const result = await runScheduledReports({
       force: true,
-      companyId: req.user.companyId || null,
+      companyId,
     });
     res.json({
       success: true,

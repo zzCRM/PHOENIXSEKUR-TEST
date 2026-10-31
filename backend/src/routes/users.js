@@ -9,6 +9,7 @@ import {
   isPlatformCompanyId,
   isPlatformUser,
 } from '../lib/tenant.js';
+import { canAssignRole } from '../lib/access.js';
 
 const router = Router();
 
@@ -263,7 +264,13 @@ router.patch('/:id', requireAuth, requireCompanyAdmin, async (req, res) => {
 
     const data = {};
     if (typeof req.body.is_active === 'boolean') data.isActive = req.body.is_active;
-    if (req.body.role) data.role = resolveInviteRole(req.body.role);
+    if (req.body.role) {
+      const nextRole = resolveInviteRole(req.body.role);
+      if (!isSuperAdmin(req.user) && !canAssignRole(req.user, nextRole)) {
+        return res.status(403).json({ error: 'Rôle non autorisé' });
+      }
+      data.role = nextRole;
+    }
 
     const updated = await prisma.user.update({ where: { id: user.id }, data });
     res.json({
