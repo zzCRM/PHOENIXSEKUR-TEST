@@ -7,7 +7,7 @@ import {
   Navigation, UserPlus, CalendarDays,
   FileSignature, ClipboardCheck, Clock, ScanLine,
   ShieldCheck, FileDown, TrendingUp, Info, X, CalendarClock, Wallet,
-  Calendar, Shield, Bookmark, CreditCard, Phone,
+  Calendar, Shield, Bookmark, CreditCard, Phone, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -29,6 +29,7 @@ const agentNavGroups = [
       { icon: BookOpen, label: 'Cahier de consignes', shortLabel: 'Consignes', path: '/espace-agent?tab=consignes', droit: 'acces_consignes' },
       { icon: CreditCard, label: 'Ma carte professionnelle', shortLabel: 'Carte pro', path: '/espace-agent?tab=carte', droit: 'acces_carte_pro' },
       { icon: Phone, label: 'Contacter l’agence', shortLabel: 'Agence', path: '/espace-agent?tab=contact', droit: 'acces_contact_societe' },
+      { icon: AlertTriangle, label: 'Protection PTI', shortLabel: 'PTI', path: '/espace-agent?tab=pti', droit: 'acces_pti' },
     ],
   },
 ];
@@ -53,6 +54,7 @@ const baseNavGroups = [
     items: [
       { icon: BookOpen, label: 'Main courante', shortLabel: 'Courante', path: '/main-courante' },
       { icon: Navigation, label: 'Supervision', path: '/carte' },
+      { icon: AlertTriangle, label: 'Protection PTI', shortLabel: 'PTI', path: '/pti' },
       { icon: FileDown, label: 'Bons d\'audit', shortLabel: 'Audits', path: '/bons-intervention' },
     ],
   },

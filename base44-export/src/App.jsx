@@ -21,6 +21,7 @@ import Rondes from '@/pages/Rondes.jsx';
 import EspaceAgent from '@/pages/EspaceAgent';
 import EspaceClient from '@/pages/EspaceClient';
 import Alertes from '@/pages/Alertes';
+import PtiParametres from '@/pages/PtiParametres';
 import Demandes from '@/pages/Demandes';
 import Documents from '@/pages/Documents';
 import CarteTempsReel from '@/pages/CarteTempsReel';
@@ -79,6 +80,7 @@ const AuthenticatedApp = () => {
         <Route path="/espace-agent" element={<EspaceAgent />} />
         <Route path="/espace-client" element={<EspaceClient />} />
         <Route path="/alertes" element={<Alertes />} />
+        <Route path="/pti" element={<PtiParametres />} />
         <Route path="/demandes" element={<Demandes />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/carte" element={<CarteTempsReel />} />

@@ -33,6 +33,9 @@ import PlanningMapView from '@/components/planning/PlanningMapView';
 import { canStartPlannedService, isServiceOverdue } from '@/lib/serviceStartRules';
 import { RUN_STATUS_META, resolveEmergencyTel, vacationRunStatus } from '@/lib/vacationStatus';
 import { dialNumber } from '@/lib/ptiAlarm';
+import PtiAgentPanel, { PtiWatchers } from '@/components/agent/PtiAgentPanel';
+import { transmitPtiAlert, flushPtiOutbox, ptiOutbox } from '@/lib/ptiTransmit';
+import { evaluateZone } from '@/lib/ptiRules';
 
 const CATEGORY_CONFIG = {
   general: { label: 'Général', color: 'bg-gray-100 text-gray-700' },
@@ -80,7 +83,7 @@ function MissionCard({ mission, today, trailing }) {
 export default function EspaceAgent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab') || 'accueil';
-  const activeTab = rawTab === 'pti' ? 'accueil' : rawTab;
+  const activeTab = rawTab;
   const setActiveTab = (tab) => {
     if (tab === 'accueil') setSearchParams({});
     else setSearchParams({ tab });
@@ -94,6 +97,9 @@ export default function EspaceAgent() {
   const [showDemandeForm, setShowDemandeForm] = useState(false);
   const [demandeForm, setDemandeForm] = useState({ subject: '', message: '' });
   const [planDay, setPlanDay] = useState(() => new Date());
+  const [ptiStatus, setPtiStatus] = useState(null);
+  const [ptiLocalOn, setPtiLocalOn] = useState(true);
+  const loggedPti = useRef(new Set());
   const [lastSeenConsignes, setLastSeenConsignes] = useState(() => {
     try { return JSON.parse(localStorage.getItem('last_seen_consignes') || '{}'); } catch { return {}; }
   });
@@ -119,6 +125,7 @@ export default function EspaceAgent() {
 
   const droits = mergeAgentDroits(agentFiche);
   const agentName = accountDisplayName(user, agentFiche);
+  const priseAgentId = agentFiche?.id || user?.id;
 
   const { data: missions = [] } = useQuery({
     queryKey: ['missions', companyId, agentFiche?.id],
@@ -230,50 +237,87 @@ export default function EspaceAgent() {
     },
   });
 
-  const geofenceAlertRef = useRef(false);
+  const { data: ptiEffective } = useQuery({
+    queryKey: ['pti-effective', companyId, priseAgentId, currentService?.site_id, currentService?.mission_id, currentSite?.geofence_radius],
+    queryFn: () => base44.pti.effective({
+      agent_id: priseAgentId,
+      site_id: currentService?.site_id,
+      mission_id: currentService?.mission_id,
+      site_radius: currentSite?.geofence_radius,
+    }),
+    enabled: !!companyId && !!droits.acces_pti,
+  });
 
-  const handleGeofenceViolation = useCallback(async ({ latitude, longitude }) => {
-    if (!currentService || geofenceAlertRef.current) return;
-    geofenceAlertRef.current = true;
-    const now = format(new Date(), 'HH:mm');
-    await alerteMut.mutateAsync({
-      company_id: companyId,
-      type: 'geofence',
-      agent_id: user?.id,
-      agent_name: agentName,
-      site_id: currentService.site_id,
-      site_name: currentService.site_name,
-      client_name: currentService.client_name,
-      message: `⚠️ ${agentName} hors zone autorisée sur ${currentService.site_name} (${now})`,
-      latitude,
-      longitude,
-      date: today,
-      time: now,
-      severity: 'urgent',
-    });
-    await mcCreateMut.mutateAsync({
+  const ptiStatusRef = useRef(null);
+  ptiStatusRef.current = ptiStatus;
+  const protectionOn = !!currentService && droits.acces_pti && (ptiEffective?.imposed !== false || ptiLocalOn);
+
+  const logPtiMainCourante = useCallback(async (item) => {
+    if (!item || item.transmission_status !== 'received' || !currentService) return;
+    if (loggedPti.current.has(item.client_event_id)) return;
+    loggedPti.current.add(item.client_event_id);
+    const payload = item.payload || {};
+    const when = item.received_at ? new Date(item.received_at) : new Date();
+    try {
+      await mcCreateMut.mutateAsync({
       company_id: companyId,
       site_id: currentService.site_id,
       site_name: currentService.site_name,
       client_name: currentService.client_name,
-      agent_id: user?.id,
+      agent_id: priseAgentId,
       agent_name: agentName,
       mission_id: currentService.mission_id,
       service_id: currentService.id,
-      date: today,
-      time: now,
-      type: 'geofence',
-      content: `Sortie de périmètre détectée — rayon ${currentSite?.geofence_radius || 200} m`,
-      latitude,
-      longitude,
+      date: format(when, 'yyyy-MM-dd'),
+      time: format(when, 'HH:mm'),
+      type: payload.type === 'sortie_zone' ? 'geofence' : 'pti_alerte',
+      content: payload.detail || 'Alerte PTI reçue par le centre',
+      latitude: payload.latitude,
+      longitude: payload.longitude,
       severity: 'urgent',
     });
-    toast.error('Hors zone — alerte envoyée au centre');
-    qc.invalidateQueries({ queryKey: ['alertes'] });
-    setTimeout(() => { geofenceAlertRef.current = false; }, 120000);
-  }, [currentService, companyId, user, agentName, today, currentSite, alerteMut, mcCreateMut, qc]);
+    } catch (err) {
+      loggedPti.current.delete(item.client_event_id);
+      throw err;
+    }
+  }, [currentService, companyId, priseAgentId, agentName, mcCreateMut]);
 
-  const { position, outsideZone } = useGeolocation({
+  const logPtiRef = useRef(logPtiMainCourante);
+  logPtiRef.current = logPtiMainCourante;
+
+  const triggerPtiAlerte = useCallback(async (reason, ptiType = 'sos', extra = {}) => {
+    const item = await transmitPtiAlert({
+      type: ptiType,
+      agent_id: priseAgentId,
+      agent_name: agentName,
+      mission_id: currentService?.mission_id || null,
+      site_id: currentService?.site_id || null,
+      site_name: currentService?.site_name || '',
+      service_id: currentService?.id || null,
+      occurred_at: new Date().toISOString(),
+      latitude: position?.latitude ?? null,
+      longitude: position?.longitude ?? null,
+      accuracy_m: position?.accuracy ?? null,
+      battery_level: extra.battery_level ?? ptiStatusRef.current?.batteryLevel ?? null,
+      connection_state: typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'online',
+      detail: reason,
+    });
+    setPtiStatus((prev) => ({
+      ...(prev || {}),
+      pending: ptiOutbox().pending(),
+      lastReceived: [...ptiOutbox().list()].reverse().find((row) => row.transmission_status === 'received') || prev?.lastReceived,
+    }));
+    if (!item || item.transmission_status !== 'received') {
+      toast.error('Alerte en attente d’envoi. Le centre ne l’a pas encore reçue.');
+      return item;
+    }
+    await logPtiRef.current?.(item);
+    qc.invalidateQueries({ queryKey: ['alertes'] });
+    toast.success('Alerte reçue et confirmée par le serveur');
+    return item;
+  }, [priseAgentId, agentName, currentService, position, qc]);
+
+  const { position, outsideZone, error: gpsError } = useGeolocation({
     active: !!currentService,
     agentId: user?.id,
     agentName,
@@ -283,57 +327,77 @@ export default function EspaceAgent() {
     companyId,
     siteLatitude: currentSite?.latitude,
     siteLongitude: currentSite?.longitude,
-    geofenceRadius: currentSite?.geofence_radius ?? 200,
-    onGeofenceViolation: handleGeofenceViolation,
+    geofenceRadius: ptiEffective?.gps_radius_m ?? currentSite?.geofence_radius ?? 200,
   });
 
-  const triggerPtiAlerte = useCallback(async (reason) => {
-    if (!currentService) return;
-    const now = format(new Date(), 'HH:mm');
-    await mcCreateMut.mutateAsync({
-      company_id: companyId,
-      site_id: currentService.site_id,
-      site_name: currentService.site_name,
-      client_name: currentService.client_name,
-      agent_id: user?.id,
-      agent_name: agentName,
-      mission_id: currentService.mission_id,
-      service_id: currentService.id,
-      date: today,
-      time: now,
-      type: 'pti_alerte',
-      content: reason || `⚠️ ALERTE PTI déclenchée à ${now}`,
-      latitude: position?.latitude,
-      longitude: position?.longitude,
-      severity: 'urgent',
-    });
-    await alerteMut.mutateAsync({
-      company_id: companyId,
-      type: 'pti_alerte',
-      agent_id: user?.id,
-      agent_name: agentName,
-      site_id: currentService.site_id,
-      site_name: currentService.site_name,
-      client_name: currentService.client_name,
-      message: `⚠️ ALERTE PTI - ${agentName} sur ${currentService.site_name} à ${now}`,
-      latitude: position?.latitude,
-      longitude: position?.longitude,
-      date: today,
-      time: now,
-      severity: 'urgent',
-    });
-    qc.invalidateQueries({ queryKey: ['alertes'] });
-  }, [currentService, companyId, user, agentName, today, position, mcCreateMut, alerteMut, qc]);
+  const sendPtiRef = useRef(triggerPtiAlerte);
+  sendPtiRef.current = triggerPtiAlerte;
+  const zoneSinceRef = useRef(null);
+  const zoneSentRef = useRef(0);
+  const zonePrealert = ptiEffective?.zone_prealerte_sec ?? 30;
+  const zoneEnabled = protectionOn && ptiEffective?.detections?.zone_gps !== false;
+  const zoneRadius = ptiEffective?.gps_radius_m || 100;
+  useEffect(() => {
+    if (!zoneEnabled || !outsideZone) {
+      zoneSinceRef.current = null;
+      return undefined;
+    }
+    if (!zoneSinceRef.current) zoneSinceRef.current = Date.now();
+    const delay = Math.max(0, zonePrealert * 1000 - (Date.now() - zoneSinceRef.current));
+    const timer = setTimeout(() => {
+      const decision = evaluateZone({
+        outside: true,
+        outsideSince: zoneSinceRef.current,
+        now: Date.now(),
+        prealertSec: zonePrealert,
+      });
+      if (decision.phase !== 'confirmed') return;
+      if (Date.now() - zoneSentRef.current < 120000) return;
+      zoneSentRef.current = Date.now();
+      sendPtiRef.current?.(`Sortie de zone — rayon ${zoneRadius} m`, 'sortie_zone');
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [outsideZone, zoneEnabled, zonePrealert, zoneRadius]);
 
-  const handlePtiAlerte = async (reason) => {
-    await triggerPtiAlerte(reason || `⚠️ ALERTE PTI manuelle à ${format(new Date(), 'HH:mm')}`);
-    toast.error('Alerte PTI envoyée');
+  useEffect(() => {
+    let stopped = false;
+    const sync = async () => {
+      const before = new Set(ptiOutbox().list().filter((item) => item.transmission_status === 'received').map((item) => item.client_event_id));
+      try { await flushPtiOutbox(); } catch { /* la file reste locale */ }
+      if (stopped) return;
+      const fresh = ptiOutbox().list().filter((item) => item.transmission_status === 'received' && !before.has(item.client_event_id));
+      for (const item of fresh) {
+        try { await logPtiRef.current?.(item); } catch { /* la main courante réessaiera */ }
+      }
+      setPtiStatus((prev) => ({
+        ...(prev || {}),
+        pending: ptiOutbox().pending(),
+        lastReceived: [...ptiOutbox().list()].reverse().find((row) => row.transmission_status === 'received') || prev?.lastReceived,
+      }));
+    };
+    sync();
+    const id = setInterval(sync, 20000);
+    window.addEventListener('online', sync);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      window.removeEventListener('online', sync);
+    };
+  }, []);
+
+  const handlePtiAlerte = (reason) => {
+    triggerPtiAlerte(reason || `SOS ${format(new Date(), 'HH:mm')}`, 'sos');
   };
 
+  const fallEnabled = protectionOn && (ptiEffective?.detections?.chute !== false || ptiEffective?.detections?.perte_verticalite !== false);
   const { pending: fallPending, cancelLeft: fallCancelLeft, cancelFall, requestArm } = useFallDetection({
-    active: !!currentService && droits.acces_pti,
+    active: fallEnabled,
+    cancelSec: ptiEffective?.chute_annulation_sec || 20,
+    confirmMs: (ptiEffective?.chute_confirmation_sec || 3) * 1000,
     onFallConfirmed: () => {
-      handlePtiAlerte('⚠️ ALERTE PTI — perte de verticalité');
+      const detections = ptiEffective?.detections || {};
+      const kind = detections.chute ? 'chute' : 'perte_verticalite';
+      triggerPtiAlerte(kind === 'chute' ? 'Chute confirmée' : 'Perte de verticalité confirmée', kind);
     },
   });
 
@@ -416,15 +480,23 @@ export default function EspaceAgent() {
   };
 
   const agentDocs = docs.filter((d) => d.target_type === 'tous' || (d.target_type === 'agent' && d.target_id === user?.id));
-  const priseAgentId = agentFiche?.id || user?.id;
 
   return (
     <div>
+      {droits.acces_pti && (
+        <PtiWatchers
+          active={protectionOn && ptiEffective?.detections?.immobilite !== false}
+          effective={ptiEffective}
+          onAlert={(type, detail, extra) => triggerPtiAlerte(detail, type, extra)}
+          onStatus={setPtiStatus}
+        />
+      )}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="sticky z-20 -mx-3 sm:-mx-4 xl:-mx-8 px-3 sm:px-4 xl:px-8 bg-background/95 backdrop-blur border-b mb-4 top-0 overflow-x-auto tabs-scroll">
           <TabsList className="flex w-max min-w-full h-12 bg-transparent p-0 rounded-none justify-start gap-0 flex-nowrap">
             {[
               { value: 'accueil', label: 'Accueil', show: true },
+              { value: 'pti', label: 'PTI', show: droits.acces_pti },
               { value: 'service', label: 'Service', show: droits.acces_services },
               { value: 'nonplanifie', label: 'Non planifié', show: droits.acces_service_non_planifie },
               { value: 'planning', label: 'Planning', show: droits.acces_planning },
@@ -909,6 +981,28 @@ export default function EspaceAgent() {
                 {demandes.length === 0 && <p className="text-muted-foreground text-sm">Aucune demande.</p>}
               </div>
             </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="pti">
+          {!droits.acces_pti ? <AccessDenied label="PTI" /> : (
+            <PtiAgentPanel
+              active={protectionOn}
+              effective={ptiEffective}
+              imposed={ptiEffective?.imposed !== false}
+              locallyEnabled={ptiLocalOn}
+              onToggleLocal={setPtiLocalOn}
+              position={position}
+              gpsError={gpsError}
+              status={ptiStatus}
+              onSos={() => {
+                if (ptiEffective?.detections?.sos === false) {
+                  toast.error('Le SOS est coupé pour ce profil');
+                  return;
+                }
+                triggerPtiAlerte(`SOS ${format(new Date(), 'HH:mm')}`, 'sos');
+              }}
+            />
           )}
         </TabsContent>
       </Tabs>

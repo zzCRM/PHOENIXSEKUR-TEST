@@ -25,21 +25,25 @@ async function requestMotionPermission() {
   }
 }
 
-export function useFallDetection({ active, onFallConfirmed }) {
+export function useFallDetection({ active, onFallConfirmed, cancelSec = CANCEL_SEC, confirmMs = CONFIRM_MS }) {
   const [armed, setArmed] = useState(false);
   const [pending, setPending] = useState(false);
-  const [cancelLeft, setCancelLeft] = useState(CANCEL_SEC);
+  const [cancelLeft, setCancelLeft] = useState(cancelSec);
   const [armNonce, setArmNonce] = useState(0);
   const pendingRef = useRef(false);
   const brutalAtRef = useRef(null);
   const onFallRef = useRef(onFallConfirmed);
+  const cancelSecRef = useRef(cancelSec);
+  const confirmMsRef = useRef(confirmMs);
   onFallRef.current = onFallConfirmed;
+  cancelSecRef.current = cancelSec;
+  confirmMsRef.current = confirmMs;
 
   const cancelFall = useCallback(() => {
     pendingRef.current = false;
     brutalAtRef.current = null;
     setPending(false);
-    setCancelLeft(CANCEL_SEC);
+    setCancelLeft(cancelSecRef.current);
   }, []);
 
   const requestArm = useCallback(async () => {
@@ -80,10 +84,10 @@ export function useFallDetection({ active, onFallConfirmed }) {
         brutalAtRef.current = null;
       }
 
-      if (brutalAtRef.current && sample.tilt >= 58 && now - brutalAtRef.current >= CONFIRM_MS) {
+      if (brutalAtRef.current && sample.tilt >= 58 && now - brutalAtRef.current >= confirmMsRef.current) {
         pendingRef.current = true;
         setPending(true);
-        setCancelLeft(CANCEL_SEC);
+        setCancelLeft(cancelSecRef.current);
       }
     };
 
@@ -115,7 +119,7 @@ export function useFallDetection({ active, onFallConfirmed }) {
           brutalAtRef.current = null;
           setPending(false);
           onFallRef.current?.();
-          return CANCEL_SEC;
+          return cancelSecRef.current;
         }
         return s - 1;
       });

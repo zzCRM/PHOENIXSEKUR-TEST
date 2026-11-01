@@ -10,6 +10,7 @@ import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
 import publicRoutes from './routes/public.js';
 import reportRoutes from './routes/reports.js';
+import ptiRoutes from './routes/pti.js';
 import { authMiddleware } from './middleware/auth.js';
 import { startReportScheduler } from './lib/report-scheduler.js';
 import { getSmtpStatus } from './lib/email.js';
@@ -61,6 +62,7 @@ app.get('/api/config/google-maps-key', (req, res) => {
 });
 
 app.use('/api/reports', reportRoutes);
+app.use('/api/pti', ptiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/entities', entityRoutes);

@@ -92,3 +92,19 @@ test('un agent ne supprime pas et ne crée pas de facture', () => {
   assert.equal(canWrite(agentA, 'PriseDeService', own, 'delete', scope(agentA)), false);
   assert.equal(canWrite(agentA, 'Invoice', { id: 'i', company_id: 'co-a', client_id: 'client-a' }, 'create', scope(agentA)), false);
 });
+
+test('le paramétrage PTI est réservé à l’administrateur de la société', () => {
+  const pti = { id: 'pti-config-co-a', company_id: 'co-a', kind: 'pti_config' };
+  const other = { id: 'pti-config-co-b', company_id: 'co-b', kind: 'pti_config' };
+  const settings = { id: 'settings-1', company_id: 'co-a', company_name: 'A' };
+  assert.equal(canRead(agentA, 'CompanySettings', pti, scope(agentA)), false);
+  assert.equal(canRead(clientA, 'CompanySettings', pti, scope(clientA)), false);
+  assert.equal(canRead(agentA, 'CompanySettings', settings, scope(agentA)), true);
+  assert.equal(canRead(adminA, 'CompanySettings', pti, scope(adminA)), true);
+  assert.equal(canRead(supervisorA, 'CompanySettings', pti, scope(supervisorA)), true);
+  assert.equal(canRead(adminA, 'CompanySettings', other, scope(adminA)), false);
+  assert.equal(canWrite(adminA, 'CompanySettings', pti, 'update', scope(adminA)), true);
+  assert.equal(canWrite(supervisorA, 'CompanySettings', pti, 'update', scope(supervisorA)), false);
+  assert.equal(canWrite(agentA, 'CompanySettings', pti, 'update', scope(agentA)), false);
+  assert.equal(canWrite(agentA, 'CompanySettings', pti, 'create', scope(agentA)), false);
+});

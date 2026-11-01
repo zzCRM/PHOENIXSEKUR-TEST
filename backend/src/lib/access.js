@@ -85,13 +85,19 @@ function onAgentSite(record, scope) {
   return Boolean(record.site_id) && scope.siteIds.has(record.site_id);
 }
 
+export function isPtiConfigRecord(entity, record) {
+  if (entity !== 'CompanySettings' || !record) return false;
+  if (record.kind === 'pti_config') return true;
+  return typeof record.id === 'string' && record.id.startsWith('pti-config-');
+}
+
 export function canRead(user, entity, record, scope = { siteIds: new Set() }) {
   if (!user || !record) return false;
   if (!isSuperAdminRole(user) && record.company_id !== user.companyId) return false;
   if (isSuperAdminRole(user) || user.role === 'admin' || user.role === 'supervisor') return true;
   if (isAgentRole(user)) {
     if (entity === 'Agent') return record.id === scope.ficheAgent?.id;
-    if (entity === 'CompanySettings') return true;
+    if (entity === 'CompanySettings') return !isPtiConfigRecord(entity, record);
     if (entity === 'Site') return scope.siteIds.has(record.id) || ownAgent(record, user, scope);
     if (entity === 'Mission' || entity === 'PriseDeService' || entity === 'FicheDePaie' || entity === 'RondeExecution' || entity === 'Geolocation' || entity === 'Conge') {
       return ownAgent(record, user, scope);
@@ -110,7 +116,7 @@ export function canRead(user, entity, record, scope = { siteIds: new Set() }) {
     const clientId = scope.ficheClient?.id;
     if (!clientId) return false;
     if (entity === 'Client') return record.id === clientId;
-    if (entity === 'CompanySettings') return true;
+    if (entity === 'CompanySettings') return !isPtiConfigRecord(entity, record);
     if (entity === 'Site') return scope.siteIds.has(record.id);
     if (entity === 'Mission' || entity === 'MainCourante' || entity === 'Ronde' || entity === 'BonIntervention') return onAgentSite(record, scope);
     if (entity === 'Invoice') return record.client_id === clientId;
@@ -129,6 +135,7 @@ export function canWrite(user, entity, record, operation, scope = { siteIds: new
     if (!user || (!isSuperAdminRole(user) && record.company_id !== user.companyId)) return false;
   } else if (!user) return false;
   if (!isSuperAdminRole(user) && record.company_id !== user.companyId) return false;
+  if (isPtiConfigRecord(entity, record) && user.role !== 'admin' && !isSuperAdminRole(user)) return false;
   if (user.role === 'admin') return true;
   if (user.role === 'supervisor') return operation !== 'delete' && entity !== 'Invoice' && entity !== 'FicheDePaie' && entity !== 'User';
   if (isAgentRole(user)) {

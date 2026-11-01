@@ -121,6 +121,38 @@ ENTITY_NAMES.forEach((name) => {
 export const phoenix = {
   entities,
 
+  pti: {
+    async ping() {
+      return apiFetch('/pti/ping');
+    },
+    async getConfig() {
+      return apiFetch('/pti/config');
+    },
+    async saveConfig(config) {
+      return apiFetch('/pti/config', { method: 'PUT', body: JSON.stringify(config) });
+    },
+    async effective(query = {}) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value != null && value !== '') params.set(key, String(value));
+      }
+      const qs = params.toString();
+      return apiFetch(`/pti/effective${qs ? `?${qs}` : ''}`);
+    },
+    async submitAlert(payload) {
+      return apiFetch('/pti/alerts', { method: 'POST', body: JSON.stringify(payload) });
+    },
+    async listAlerts() {
+      return apiFetch('/pti/alerts');
+    },
+    async applyDue() {
+      return apiFetch('/pti/alerts/due', { method: 'POST', body: '{}' });
+    },
+    async act(id, payload) {
+      return apiFetch(`/pti/alerts/${id}`, { method: 'POST', body: JSON.stringify(payload) });
+    },
+  },
+
   reports: {
     async sendEmail(payload) {
       return apiFetch('/reports/send-email', {

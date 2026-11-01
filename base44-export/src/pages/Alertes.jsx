@@ -166,6 +166,12 @@ export default function Alertes() {
                         Voir sur carte
                       </a>
                     )}
+                    {alerte.pti && alerte.transmission_status === 'received' && (
+                      <span>Reçue par le serveur</span>
+                    )}
+                    {alerte.pti && (
+                      <a href="/pti" className="text-primary underline" onClick={e => e.stopPropagation()}>Traiter</a>
+                    )}
                   </div>
                 </div>
               </div>
