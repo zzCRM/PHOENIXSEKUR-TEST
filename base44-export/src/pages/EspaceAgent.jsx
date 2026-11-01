@@ -3,8 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Clock, AlertTriangle, CheckCircle2, Download, MapPin, Navigation,
-  BookOpen, Bell, Calendar, Lock, Phone, Mail, CreditCard, Building2,
+  Clock, AlertTriangle, Download, MapPin, Navigation,
+  BookOpen, Bell, Lock, Phone, Mail, CreditCard, Building2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ import PtiCheckOverlay from '@/components/agent/PtiCheckOverlay';
 import { toast } from 'sonner';
 import PriseDeServiceNFC from '@/components/agent/PriseDeServiceNFC';
 import FinDeServicePhoto from '@/components/agent/FinDeServicePhoto';
-import RondeNFC from '@/components/agent/RondeNFC';
+import RondeNFC, { flushRondeOutbox } from '@/components/agent/RondeNFC';
 import ServiceChrono from '@/components/agent/ServiceChrono';
 import ServiceNonPlanifie from '@/components/agent/ServiceNonPlanifie';
 import ServiceEnCours from '@/components/agent/ServiceEnCours';
@@ -285,6 +285,19 @@ export default function EspaceAgent() {
   const logPtiRef = useRef(logPtiMainCourante);
   logPtiRef.current = logPtiMainCourante;
 
+  const { position, outsideZone, error: gpsError } = useGeolocation({
+    active: !!currentService,
+    agentId: user?.id,
+    agentName,
+    serviceId: currentService?.id,
+    siteId: currentService?.site_id,
+    siteName: currentService?.site_name,
+    companyId,
+    siteLatitude: currentSite?.latitude,
+    siteLongitude: currentSite?.longitude,
+    geofenceRadius: ptiEffective?.gps_radius_m ?? currentSite?.geofence_radius ?? 200,
+  });
+
   const triggerPtiAlerte = useCallback(async (reason, ptiType = 'sos', extra = {}) => {
     const item = await transmitPtiAlert({
       type: ptiType,
@@ -316,19 +329,6 @@ export default function EspaceAgent() {
     toast.success('Alerte reçue et confirmée par le serveur');
     return item;
   }, [priseAgentId, agentName, currentService, position, qc]);
-
-  const { position, outsideZone, error: gpsError } = useGeolocation({
-    active: !!currentService,
-    agentId: user?.id,
-    agentName,
-    serviceId: currentService?.id,
-    siteId: currentService?.site_id,
-    siteName: currentService?.site_name,
-    companyId,
-    siteLatitude: currentSite?.latitude,
-    siteLongitude: currentSite?.longitude,
-    geofenceRadius: ptiEffective?.gps_radius_m ?? currentSite?.geofence_radius ?? 200,
-  });
 
   const sendPtiRef = useRef(triggerPtiAlerte);
   sendPtiRef.current = triggerPtiAlerte;
@@ -405,9 +405,24 @@ export default function EspaceAgent() {
     if (currentService && droits.acces_pti) requestArm();
   }, [currentService?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const flush = () => flushRondeOutbox()
+      .then((summary) => {
+        if (summary.sent > 0) {
+          qc.invalidateQueries({ queryKey: ['ronde_execs'] });
+          qc.invalidateQueries({ queryKey: ['mc_service'] });
+          qc.invalidateQueries({ queryKey: ['main_courante'] });
+        }
+      })
+      .catch(() => {});
+    flush();
+    window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, [qc]);
+
   const agentSiteIds = siteIdSet;
   const mcFiltered = mainCouranteData.filter((mc) => agentSiteIds.includes(mc.site_id));
-  const rondesFiltrees = rondes.filter((r) => agentSiteIds.includes(r.site_id));
+  const rondesFiltrees = rondes.filter((r) => r.status !== 'inactif' && agentSiteIds.includes(r.site_id));
   const checkpoints = rondesFiltrees.flatMap((r) => (r.checkpoints || []).map((cp) => ({
     ...cp,
     ronde_name: r.name,
@@ -712,6 +727,33 @@ export default function EspaceAgent() {
           {!droits.acces_rondes ? <AccessDenied label="Rondes" /> : (
             <>
               <h2 className="text-lg font-semibold">Rondes de mes sites</h2>
+              <Card className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Ronde libre</p>
+                    <p className="text-sm text-muted-foreground">Sans badge ni parcours : contrôles, observations, anomalies{currentService?.site_name ? ` • ${currentService.site_name}` : ''}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => {
+                      const site = sites.find((item) => item.id === currentService?.site_id) || sites.find((item) => agentSiteIds.includes(item.id));
+                      startRonde({
+                        id: `libre-${site?.id || 'site'}`,
+                        libre: true,
+                        name: 'Ronde libre',
+                        site_id: site?.id || '',
+                        site_name: site?.name || '',
+                        client_id: site?.client_id || '',
+                        client_name: site?.client_name || '',
+                        checkpoints: [],
+                      });
+                    }}
+                  >
+                    <MapPin className="w-4 h-4" /> Démarrer
+                  </Button>
+                </div>
+              </Card>
               {rondesFiltrees.length === 0 && <p className="text-muted-foreground text-sm">Aucune ronde configurée sur vos sites.</p>}
               {rondesFiltrees.map((ronde) => (
                 <Card key={ronde.id} className="p-4">

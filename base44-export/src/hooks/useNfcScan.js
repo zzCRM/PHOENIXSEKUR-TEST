@@ -75,7 +75,11 @@ export function useNfcScan() {
           await ndef.scan({ signal: controller.signal });
 
           ndef.addEventListener('reading', (event) => {
-            const id = event.serialNumber || `NFC-${Date.now()}`;
+            const id = event.serialNumber;
+            if (!id) {
+              setError('Badge lu mais sans identifiant : approchez-le de nouveau ou utilisez un autre tag.');
+              return;
+            }
             cleanup();
             setTagId(id);
             setStatus('success');

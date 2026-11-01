@@ -105,7 +105,7 @@ export default function ServiceEnCours({
     agent_id: service.agent_id || agentId,
     agent_name: service.agent_name || agentName,
   }, nowHm));
-  const siteRondes = rondes.filter((r) => !service.site_id || r.site_id === service.site_id);
+  const siteRondes = rondes.filter((r) => r.status !== 'inactif' && r.site_id && (!service.site_id || r.site_id === service.site_id));
   const rondesDone = myExecs.filter((e) => e.status === 'terminee' || e.end_time).length;
   const rondesPlanned = siteRondes.length;
 
@@ -192,6 +192,9 @@ export default function ServiceEnCours({
   const startLibre = () => {
     onStartRonde({
       id: `libre-${service.site_id || 'site'}`,
+      libre: true,
+      client_id: service.client_id,
+      client_name: service.client_name,
       name: 'Ronde libre',
       site_id: service.site_id,
       site_name: service.site_name,
@@ -302,25 +305,31 @@ export default function ServiceEnCours({
           <Button
             size="icon"
             className="h-14 w-14 rounded-full bg-emerald-600 hover:bg-emerald-700"
-            onClick={() => (siteRondes[0] ? onStartRonde(siteRondes[0]) : startLibre())}
+            onClick={startLibre}
             disabled={onPause || needsProlongation}
+            aria-label="Démarrer une ronde libre"
           >
             <Play className="w-6 h-6 fill-white" />
           </Button>
           <button type="button" className="flex-1 text-left" onClick={() => setShowRondeDetail((v) => !v)}>
             <p className="font-bold uppercase tracking-wide text-sm">Ronde libre</p>
-            <p className="text-sm text-muted-foreground">{rondesDone}/{rondesPlanned} réalisées</p>
+            <p className="text-sm text-muted-foreground">Sans badge ni parcours : contrôles, observations et anomalies</p>
           </button>
-          <Badge variant="outline">{rondesDone}/{rondesPlanned}</Badge>
         </div>
-        {siteRondes.length > 1 && (
-          <div className="mt-3 space-y-2">
-            {siteRondes.map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-2 text-sm">
-                <span>{r.name}</span>
-                <Button size="sm" variant="secondary" disabled={onPause || needsProlongation} onClick={() => onStartRonde(r)}>Démarrer</Button>
-              </div>
-            ))}
+        {siteRondes.length > 0 && (
+          <div className="mt-4 border-t pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rondes du site (badges NFC)</p>
+              <Badge variant="outline">{rondesDone}/{rondesPlanned}</Badge>
+            </div>
+            <div className="space-y-2">
+              {siteRondes.map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span>{r.name}</span>
+                  <Button size="sm" variant="secondary" disabled={onPause || needsProlongation} onClick={() => onStartRonde(r)}>Démarrer</Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <button type="button" className="mt-3 text-xs text-muted-foreground flex items-center gap-1" onClick={() => setShowRondeDetail((v) => !v)}>
