@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Phoenix Sekur</string>
+    <string name="open">Ouvrir Phoenix Sekur</string>
+    <string name="notice">L’application s’ouvre dans Chrome. Le NFC des badges et le PTI de la page fonctionnent tant que Chrome reste ouvert. Le téléphone verrouillé ne surveille pas l’agent. Ce n’est pas un boîtier DATI.</string>
+</resources>
