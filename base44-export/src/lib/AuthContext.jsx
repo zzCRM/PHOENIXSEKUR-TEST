@@ -1,9 +1,30 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { base44, isOwnApi } from '@/api/base44Client';
-import { appParams } from '@/lib/app-params';
-import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { base44 } from '@/api/base44Client';
+import { establishPhoenixSession } from '@/lib/phoenixSession';
 
 const AuthContext = createContext();
+
+async function fetchSessionToken() {
+  try {
+    const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
+    const sessionData = await sessionRes.json();
+    if (sessionData.authenticated && sessionData.access_token) {
+      return sessionData.access_token;
+    }
+  } catch {
+    // Pas de cookie de session, ou réseau indisponible.
+  }
+  return null;
+}
+
+async function readCurrentUser() {
+  try {
+    const user = await base44.auth.me();
+    return { ok: true, status: 200, user };
+  } catch (error) {
+    return { ok: false, status: error.status, user: null };
+  }
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -14,81 +35,40 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
 
-  useEffect(() => {
-    checkAppState();
-  }, []);
+  const applySessionResult = (result) => {
+    if (result.ok && result.user) {
+      setUser(result.user);
+      setIsAuthenticated(true);
+      setAuthError(null);
+      return;
+    }
+    setUser(null);
+    setIsAuthenticated(false);
+    setAuthError({ type: 'auth_required', message: 'Authentication required' });
+  };
+
+  const checkUserAuth = async () => {
+    setIsLoadingAuth(true);
+    const result = await establishPhoenixSession({
+      getToken: () => base44.auth.getToken?.() || null,
+      setToken: (token) => base44.auth.setToken(token),
+      clearLocalToken: () => base44.auth.clearLocalToken(),
+      me: readCurrentUser,
+      fetchSession: fetchSessionToken,
+    });
+    applySessionResult(result);
+    setIsLoadingAuth(false);
+    setAuthChecked(true);
+    return result.ok;
+  };
 
   const checkAppState = async () => {
     try {
       setIsLoadingPublicSettings(true);
       setAuthError(null);
-
-      // Mode autonome (sans Base44)
-      if (isOwnApi) {
-        setAppPublicSettings({ id: 'phoenixsekur', public_settings: {} });
-        let token = base44.auth.getToken?.();
-        if (!token) {
-          try {
-            const sessionRes = await fetch('/api/auth/session', { credentials: 'include' });
-            const sessionData = await sessionRes.json();
-            if (sessionData.authenticated && sessionData.access_token) {
-              base44.auth.setToken(sessionData.access_token);
-              token = sessionData.access_token;
-            }
-          } catch {
-            // Pas de session cookie — redirection vers www
-          }
-        }
-        if (token) {
-          await checkUserAuth();
-        } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-          setAuthChecked(true);
-          setAuthError({ type: 'auth_required', message: 'Authentication required' });
-        }
-        setIsLoadingPublicSettings(false);
-        return;
-      }
-
-      // Mode Base44 (legacy)
-      const appClient = createAxiosClient({
-        baseURL: `/api/apps/public`,
-        headers: { 'X-App-Id': appParams.appId },
-        token: appParams.token,
-        interceptResponses: true,
-      });
-
-      try {
-        const publicSettings = await appClient.get(`/prod/public-settings/by-id/${appParams.appId}`);
-        setAppPublicSettings(publicSettings);
-
-        if (appParams.token) {
-          await checkUserAuth();
-        } else {
-          setIsLoadingAuth(false);
-          setIsAuthenticated(false);
-          setAuthChecked(true);
-        }
-        setIsLoadingPublicSettings(false);
-      } catch (appError) {
-        console.error('App state check failed:', appError);
-
-        if (appError.status === 403 && appError.data?.extra_data?.reason) {
-          const reason = appError.data.extra_data.reason;
-          if (reason === 'auth_required') {
-            setAuthError({ type: 'auth_required', message: 'Authentication required' });
-          } else if (reason === 'user_not_registered') {
-            setAuthError({ type: 'user_not_registered', message: 'User not registered for this app' });
-          } else {
-            setAuthError({ type: reason, message: appError.message });
-          }
-        } else {
-          setAuthError({ type: 'unknown', message: appError.message || 'Failed to load app' });
-        }
-        setIsLoadingPublicSettings(false);
-        setIsLoadingAuth(false);
-      }
+      setAppPublicSettings({ id: 'phoenixsekur', public_settings: {} });
+      await checkUserAuth();
+      setIsLoadingPublicSettings(false);
     } catch (error) {
       console.error('Unexpected error:', error);
       setAuthError({ type: 'unknown', message: error.message || 'An unexpected error occurred' });
@@ -97,38 +77,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const checkUserAuth = async () => {
-    try {
-      setIsLoadingAuth(true);
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      setIsAuthenticated(true);
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
-      setAuthError(null);
-    } catch (error) {
-      console.error('User auth check failed:', error);
-      setIsLoadingAuth(false);
-      setIsAuthenticated(false);
-      setAuthChecked(true);
-
-      if (error.status === 401 || error.status === 403) {
-        setAuthError({ type: 'auth_required', message: 'Authentication required' });
-      }
-    }
-  };
+  useEffect(() => {
+    checkAppState();
+  }, []);
 
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
-
-    if (isOwnApi) {
-      base44.auth.logout(shouldRedirect ? undefined : null);
-    } else if (shouldRedirect) {
-      base44.auth.logout(window.location.href);
-    } else {
-      base44.auth.logout(null);
-    }
+    base44.auth.logout(shouldRedirect ? undefined : null);
   };
 
   const navigateToLogin = () => {

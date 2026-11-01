@@ -9,9 +9,13 @@ function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
-function clearToken() {
+function clearLocalToken() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem('base44_access_token');
+}
+
+function clearToken() {
+  clearLocalToken();
 }
 
 async function apiFetch(path, options = {}) {
@@ -178,6 +182,7 @@ export const phoenix = {
 
     setToken,
     getToken,
+    clearLocalToken,
   },
 
   users: {
