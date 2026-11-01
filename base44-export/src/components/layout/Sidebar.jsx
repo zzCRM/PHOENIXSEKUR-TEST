@@ -36,66 +36,51 @@ const agentNavGroups = [
 
 const baseNavGroups = [
   {
-    label: 'Général',
+    label: '',
     items: [
-      { icon: LayoutDashboard, label: 'Tableau de bord', shortLabel: 'Accueil', path: '/' },
+      { icon: LayoutDashboard, label: 'Tableau de bord', shortLabel: 'Accueil', path: '/', home: true },
     ],
   },
   {
-    label: 'Planification',
+    label: 'Exploitation',
     items: [
-      { icon: BarChart3, label: 'Planning', path: '/planning' },
+      { icon: Calendar, label: 'Planning', path: '/planning' },
       { icon: ClipboardCheck, label: 'Services', path: '/missions' },
-      { icon: Clock, label: 'Écarts horaires', shortLabel: 'Écarts', path: '/ecarts-horaires' },
-    ],
-  },
-  {
-    label: 'Terrain',
-    items: [
+      { icon: Navigation, label: 'Supervision', path: '/carte', live: true },
       { icon: BookOpen, label: 'Main courante', shortLabel: 'Courante', path: '/main-courante' },
-      { icon: Navigation, label: 'Supervision', path: '/carte' },
-      { icon: AlertTriangle, label: 'Protection PTI', shortLabel: 'PTI', path: '/pti' },
-      { icon: FileDown, label: 'Bons d\'audit', shortLabel: 'Audits', path: '/bons-intervention' },
-    ],
-  },
-  {
-    label: 'Sites',
-    items: [
-      { icon: MapPin, label: 'Sites', path: '/sites' },
-      { icon: CalendarClock, label: 'Heures de sites', shortLabel: 'H. sites', path: '/heures-sites' },
       { icon: Route, label: 'Rondes', path: '/rondes' },
       { icon: ScanLine, label: 'Points de contrôle', shortLabel: 'Contrôles', path: '/points-controle' },
+      { icon: AlertTriangle, label: 'Protection PTI', shortLabel: 'PTI', path: '/pti' },
     ],
   },
   {
-    label: 'Commercial',
+    label: 'Ressources',
     items: [
-      { icon: TrendingUp, label: 'Leads', path: '/leads' },
-    ],
-  },
-  {
-    label: 'Clients',
-    items: [
+      { icon: Users, label: 'Agents', path: '/agents' },
+      { icon: MapPin, label: 'Sites', path: '/sites' },
+      { icon: Clock, label: 'Écarts horaires', shortLabel: 'Écarts', path: '/ecarts-horaires' },
+      { icon: FileDown, label: 'Bons d\'audit', shortLabel: 'Audits', path: '/bons-intervention' },
       { icon: Building2, label: 'Clients', path: '/clients' },
-      { icon: MessageSquare, label: 'Demandes', path: '/demandes' },
-      { icon: FileText, label: 'Documents', path: '/documents' },
-      { icon: FileSignature, label: 'Contrats', path: '/contrats' },
-      { icon: FileDown, label: 'Rapports PDF', shortLabel: 'Rapports', path: '/rapports-pdf' },
-    ],
-  },
-  {
-    label: 'Collaborateurs',
-    items: [
-      { icon: Users, label: 'Collaborateurs', shortLabel: 'Équipe', path: '/agents' },
-      { icon: Clock, label: 'Heures', path: '/heures-collaborateurs' },
       { icon: Wallet, label: 'Prépaie', path: '/prepaie' },
       { icon: CalendarDays, label: 'Congés', path: '/conges' },
     ],
   },
   {
-    label: 'Société',
+    label: 'Analyses',
+    items: [
+      { icon: BarChart3, label: 'Statistiques', path: '/heures-sites' },
+      { icon: CalendarClock, label: 'Heures', path: '/heures-collaborateurs' },
+      { icon: FileText, label: 'Rapports', path: '/rapports-pdf' },
+      { icon: TrendingUp, label: 'Leads', path: '/leads' },
+    ],
+  },
+  {
+    label: 'Paramètres',
     items: [
       { icon: Info, label: 'Paramètres', path: '/parametres-societe' },
+      { icon: MessageSquare, label: 'Demandes', path: '/demandes' },
+      { icon: FileSignature, label: 'Contrats', path: '/contrats' },
+      { icon: FileText, label: 'Documents', path: '/documents' },
     ],
   },
 ];
@@ -169,7 +154,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
   };
 
   return (
-    <div className="h-full max-h-[100dvh] bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden">
+    <div className="h-full max-h-[100dvh] bg-[#06101c] text-white/80 flex flex-col overflow-hidden">
       {/* Header */}
       <div className={cn(
         'flex items-center justify-between px-3 sm:px-4 border-b border-sidebar-border shrink-0',
@@ -182,8 +167,9 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-contain bg-black shrink-0"
           />
           {(!collapsed || isMobileDrawer) && (
-            <span className="text-sm font-bold text-white tracking-tight leading-tight truncate">
-              Phoenix<br />Sekur
+            <span className="min-w-0 leading-tight truncate">
+              <span className="block text-[13px] font-extrabold tracking-[0.14em] text-white">PHOENIX SEKUR</span>
+              <span className="block text-[9px] tracking-[0.18em] text-amber-200/70">SECURITY MANAGEMENT</span>
             </span>
           )}
         </div>
@@ -204,7 +190,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
         {navGroups.map((group) => (
           <div key={group.label}>
             {(!collapsed || isMobileDrawer) && (
-              <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40">
+              <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
                 {group.label}
               </p>
             )}
@@ -226,20 +212,21 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
                     onClick={handleLinkClick}
                     title={item.label}
                     className={cn(
-                      'flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200',
+                      'flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
                       isMobileDrawer ? 'px-3 py-3 min-h-[44px]' : 'px-3 py-2.5',
                       isActive
-                        ? 'bg-primary/15 text-primary'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                        ? 'bg-[#e4b54a] text-[#1c1403]'
+                        : 'text-white/75 hover:bg-white/5 hover:text-white',
                     )}
                   >
                     <item.icon
-                      className={cn('shrink-0', isActive && 'text-primary')}
+                      className="shrink-0"
                       style={{ width: 18, height: 18 }}
                     />
                     {(!collapsed || isMobileDrawer) && (
-                      <span className="truncate">
+                      <span className="truncate flex items-center gap-2">
                         {isMobileDrawer && item.shortLabel ? item.shortLabel : item.label}
+                        {item.live && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                       </span>
                     )}
                   </Link>
@@ -251,7 +238,7 @@ export default function Sidebar({ collapsed, setCollapsed, onMobileClose }) {
       </nav>
 
       {/* Footer sticky — déconnexion toujours visible */}
-      <div className="shrink-0 p-2 border-t border-sidebar-border bg-sidebar space-y-0.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div className="shrink-0 p-2 border-t border-white/10 bg-[#06101c] space-y-0.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {!isMobileDrawer && (
           <button
             type="button"
