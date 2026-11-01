@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Building2, HardHat, Landmark, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Building2, HardHat, Landmark, Loader2, UserPlus } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { getHomePathForUser } from '@/lib/roleRoutes';
 import { Button } from '@/components/ui/button';
@@ -28,12 +29,25 @@ const PORTALS = [
   },
 ];
 
+function invitationPath(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  const embedded = text.match(/invitation\/([a-f0-9]{32,})/i);
+  if (embedded) return `/invitation/${embedded[1]}`;
+  if (/^[a-f0-9]{32,}$/i.test(text)) return `/invitation/${text}`;
+  return null;
+}
+
 export default function Login() {
+  const navigate = useNavigate();
   const [portal, setPortal] = useState('entreprise');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteError, setInviteError] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -164,6 +178,50 @@ export default function Login() {
               )}
             </Button>
           </form>
+
+          <div className="mt-5 pt-5 border-t border-white/10 space-y-2">
+            <p className="text-sm font-semibold">Vous avez été invité ?</p>
+            <p className="text-xs text-white/60">
+              Collez le lien reçu par email. Vous choisissez ensuite votre mot de passe avec le bouton « Créer mon compte ».
+            </p>
+            {inviteOpen ? (
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  value={inviteLink}
+                  onChange={(e) => { setInviteLink(e.target.value); setInviteError(null); }}
+                  placeholder="Collez le lien d’invitation"
+                  className="h-11 bg-black/40 border-white/15 text-white placeholder:text-white/30"
+                />
+                {inviteError && <p className="text-sm text-red-300">{inviteError}</p>}
+                <Button
+                  type="button"
+                  className="w-full h-11 bg-[#c0392b] hover:bg-[#a93226] text-white font-semibold"
+                  onClick={() => {
+                    const path = invitationPath(inviteLink);
+                    if (!path) {
+                      setInviteError('Ce lien n’est pas une invitation Phoenix Sekur.');
+                      return;
+                    }
+                    navigate(path);
+                  }}
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Créer mon compte
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
+                onClick={() => setInviteOpen(true)}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Créer mon compte
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

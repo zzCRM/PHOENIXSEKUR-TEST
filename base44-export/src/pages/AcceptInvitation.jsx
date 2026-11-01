@@ -111,7 +111,7 @@ export default function AcceptInvitation() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
               <div className="space-y-2">
                 <Label htmlFor="firstName">Prénom</Label>
                 <Input

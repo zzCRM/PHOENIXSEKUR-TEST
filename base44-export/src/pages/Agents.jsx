@@ -21,6 +21,7 @@ export default function Agents() {
   const [editAgent, setEditAgent] = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [search, setSearch] = useState('');
+  const [inviteNotice, setInviteNotice] = useState(null);
   const qc = useQueryClient();
 
   const { data: agents = [], isLoading } = useQuery({
@@ -43,9 +44,8 @@ export default function Agents() {
     onSuccess: ({ invite }) => {
       qc.invalidateQueries({ queryKey: ['agents', companyId] });
       setShowForm(false);
-      if (invite?.email_sent) toast.success('Collaborateur créé — invitation envoyée par email');
-      else if (invite?.invite_url) toast.warning('Collaborateur créé — invitation créée, email non envoyé (copiez le lien depuis Utilisateurs)');
-      else if (invite?.already_registered) toast.success('Collaborateur créé — un compte existe déjà pour cet email');
+      const notice = inviteNoticeFrom(invite);
+      if (notice) setInviteNotice(notice);
       else toast.success('Collaborateur créé avec succès');
     },
     onError: (error) => { toast.error('Échec de la création : ' + (error.message || 'Erreur inconnue')); },
@@ -64,7 +64,8 @@ export default function Agents() {
     onSuccess: ({ invite }) => {
       qc.invalidateQueries({ queryKey: ['agents', companyId] });
       setEditAgent(null);
-      if (invite?.email_sent) toast.success('Fiche enregistrée — invitation envoyée');
+      const notice = inviteNoticeFrom(invite);
+      if (notice) setInviteNotice(notice);
       else toast.success('Agent modifié avec succès');
     },
     onError: (error) => { toast.error('Échec de la modification : ' + (error.message || 'Erreur inconnue')); },
@@ -85,10 +86,43 @@ export default function Agents() {
   return (
     <div>
       {selectedAgent && (
-        <AgentDetailView agent={selectedAgent} onClose={() => setSelectedAgent(null)} />
+        <AgentDetailView
+          agent={selectedAgent}
+          onClose={() => setSelectedAgent(null)}
+          onInvited={(invite) => {
+            const notice = inviteNoticeFrom(invite);
+            if (notice) setInviteNotice(notice);
+          }}
+        />
       )}
 
       <PageHeader title="Collaborateurs" subtitle={!showSkeleton ? `${agents.length} collaborateurs enregistrés` : ''} actionLabel="Nouveau collaborateur" onAction={() => setShowForm(true)} />
+
+      {inviteNotice && (
+        <div className="mb-4 rounded-xl border border-[#e4b54a]/60 bg-[#fffaf0] p-4 space-y-2">
+          <p className="font-semibold text-[#1c1403]">{inviteNotice.title}</p>
+          <p className="text-sm text-slate-600">{inviteNotice.detail}</p>
+          {inviteNotice.url && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input readOnly value={inviteNotice.url} className="font-mono text-xs" onFocus={(event) => event.target.select()} />
+              <Button
+                type="button"
+                className="bg-[#e4b54a] hover:bg-[#d7a63a] text-[#1c1403] shrink-0"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(inviteNotice.url);
+                    toast.success('Lien copié');
+                  } catch {
+                    toast.message('Sélectionnez le lien et copiez-le');
+                  }
+                }}
+              >
+                Copier le lien
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       
       <div className="mb-6">
         <div className="relative max-w-sm">
@@ -174,4 +208,30 @@ export default function Agents() {
       />
     </div>
   );
+}
+
+function inviteNoticeFrom(invite) {
+  if (!invite) return null;
+  if (invite.already_registered) {
+    return {
+      title: 'Un compte existe déjà',
+      detail: `L’adresse ${invite.email || 'indiquée'} a déjà un compte. La personne se connecte avec son mot de passe.`,
+      url: '',
+    };
+  }
+  if (invite.email_sent) {
+    return {
+      title: 'Invitation envoyée',
+      detail: `Un email est parti vers ${invite.email || 'le collaborateur'}. Il ouvre le lien et clique sur « Créer mon compte ».`,
+      url: invite.invite_url || '',
+    };
+  }
+  if (invite.invite_url) {
+    return {
+      title: 'Lien pour créer le compte',
+      detail: 'L’email n’est pas parti. Copiez ce lien et envoyez-le. La personne clique sur « Créer mon compte ».',
+      url: invite.invite_url,
+    };
+  }
+  return null;
 }

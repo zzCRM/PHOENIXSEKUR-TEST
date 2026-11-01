@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  X, User, Shield, Briefcase, Monitor, Settings, Mail, CreditCard, Bell,
+  X, User, UserPlus, Shield, Briefcase, Monitor, Settings, Mail, CreditCard, Bell,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,6 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
   const [form, setForm] = useState(empty);
   const [droits, setDroits] = useState({ ...DEFAULT_DROITS_AGENT });
   const [agentRole, setAgentRole] = useState('agent');
-  const [creerCompte, setCreerCompte] = useState(false);
   const [notifications, setNotifications] = useState({ expiration: true, rappels: true });
   const [uploading, setUploading] = useState(false);
 
@@ -89,7 +88,6 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
       setAgentRole('agent');
       setNotifications({ expiration: true, rappels: true });
     }
-    setCreerCompte(false);
     setTab('infos');
   }, [agent, open]);
 
@@ -131,15 +129,16 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
     }
   };
 
-  const save = (draft) => {
+  const save = (draft, forceAccount = false) => {
+    const withAccount = !draft && forceAccount;
     if (!form.first_name || !form.last_name) {
       toast.error('Le prénom et le nom sont requis');
       setTab('infos');
       return;
     }
-    if (creerCompte && !form.email) {
-      toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
-      setTab('acces');
+    if (withAccount && !form.email) {
+      toast.error('Indiquez l’email professionnel pour créer le compte');
+      setTab('infos');
       return;
     }
     onSubmit({
@@ -149,7 +148,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
       role: agentRole,
       droits_portail: droits,
       notifications,
-      creer_compte_phoenix: draft ? false : creerCompte,
+      creer_compte_phoenix: withAccount,
       draft: !!draft,
       acces_espace_agent: form.acces_espace_agent !== false,
     });
@@ -158,8 +157,8 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 sm:py-4 px-0 sm:px-4 overflow-y-auto">
-      <div className="bg-[#f7f8fb] sm:rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[94vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center bg-black/45 p-0 sm:p-4">
+      <div className="bg-[#f7f8fb] sm:rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col h-[100dvh] sm:h-[min(940px,calc(100dvh-2rem))] overflow-hidden">
         <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-5 py-4 bg-[#10192b] text-white">
           <div className="flex items-center gap-3 min-w-0">
             <span className="w-10 h-10 rounded-xl bg-[#e4b54a] text-[#1c1403] flex items-center justify-center shrink-0">
@@ -194,12 +193,12 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
               {tab === 'infos' && (
                 <>
                   <Card icon={User} title="Identité">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <label className="w-28 h-28 shrink-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center text-[11px] text-slate-500 cursor-pointer overflow-hidden">
+                    <div className="flex flex-col sm:flex-row gap-4 min-w-0">
+                      <label className="w-full sm:w-28 h-28 shrink-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center text-[11px] text-slate-500 cursor-pointer overflow-hidden">
                         {form.photo_url ? <img src={form.photo_url} alt="" className="w-full h-full object-cover" /> : <><User className="w-6 h-6 mb-1" />{uploading ? 'Envoi…' : 'Ajouter une photo'}<span>JPG, PNG (max. 5 Mo)</span></>}
                         <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadPhoto(event.target.files?.[0])} />
                       </label>
-                      <div className="grid sm:grid-cols-3 gap-3 flex-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 min-w-0">
                         <Field label="Civilité">
                           <Select value={form.civilite} onValueChange={(value) => patch({ civilite: value })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -212,7 +211,7 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
                         </Field>
                         <Field label="Prénom *"><Input value={form.first_name} onChange={(event) => patch({ first_name: event.target.value })} /></Field>
                         <Field label="Nom *"><Input value={form.last_name} onChange={(event) => patch({ last_name: event.target.value })} /></Field>
-                        <Field label="Date de naissance"><Input type="date" value={String(form.date_naissance || '').slice(0, 10)} onChange={(event) => patch({ date_naissance: event.target.value })} /></Field>
+                        <Field label="Date de naissance"><Input type="date" className="min-w-0 max-w-full" value={String(form.date_naissance || '').slice(0, 10)} onChange={(event) => patch({ date_naissance: event.target.value })} /></Field>
                         <Field label="Lieu de naissance"><Input value={form.lieu_naissance || ''} onChange={(event) => patch({ lieu_naissance: event.target.value })} placeholder="Ville, pays" /></Field>
                         <Field label="Nationalité">
                           <Select value={form.nationalite || 'Française'} onValueChange={(value) => patch({ nationalite: value })}>
@@ -226,22 +225,32 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
                     </div>
                   </Card>
                   <Card icon={Mail} title="Coordonnées">
-                    <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                       <Field label="Email professionnel"><Input type="email" value={form.email || ''} onChange={(event) => patch({ email: event.target.value })} placeholder="email@phoenixsekur.fr" /></Field>
                       <Field label="Téléphone"><Input value={form.phone || ''} onChange={(event) => patch({ phone: event.target.value })} placeholder="06 00 00 00 00" /></Field>
                       <Field label="Adresse">
                         <AddressAutocomplete value={form.address || ''} onChange={(value) => patch({ address: value })} onPlaceSelect={(place) => patch({ address: place.address || form.address, postal_code: place.postal_code, city: place.city })} />
                       </Field>
                     </div>
+                    <div className="rounded-xl border border-[#e4b54a]/50 bg-[#fffaf0] p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[#1c1403]">Compte du collaborateur</p>
+                        <p className="text-xs text-slate-600 mt-0.5">Envoie un lien d’invitation à l’email professionnel. La personne ouvre ce lien et appuie sur « Créer mon compte ».</p>
+                      </div>
+                      <Button type="button" onClick={() => save(false, true)} className={cn(GOLD, 'shrink-0')}>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Créer le compte
+                      </Button>
+                    </div>
                   </Card>
                   <Card icon={CreditCard} title="Identifiants professionnels">
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                       <Field label="N° carte professionnelle CNAPS"><Input value={form.card_number || ''} onChange={(event) => patch({ card_number: event.target.value })} placeholder="CARTE-123456" /></Field>
-                      <Field label="Date d’expiration"><Input type="date" value={String(form.card_expiry || '').slice(0, 10)} onChange={(event) => patch({ card_expiry: event.target.value })} /></Field>
+                      <Field label="Date d’expiration"><Input type="date" className="min-w-0 max-w-full" value={String(form.card_expiry || '').slice(0, 10)} onChange={(event) => patch({ card_expiry: event.target.value })} /></Field>
                     </div>
                   </Card>
                   <Card icon={Briefcase} title="Statut et poste principal">
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                       <Field label="Statut">
                         <Select value={form.status || 'actif'} onValueChange={(value) => patch({ status: value })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
@@ -288,9 +297,9 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
 
               {tab === 'emploi' && (
                 <Card icon={Briefcase} title="Emploi & contrat">
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <Field label="Date d’embauche"><Input type="date" value={String(form.hire_date || '').slice(0, 10)} onChange={(event) => patch({ hire_date: event.target.value })} /></Field>
-                    <Field label="Fin de contrat"><Input type="date" value={String(form.date_fin_contrat || '').slice(0, 10)} onChange={(event) => patch({ date_fin_contrat: event.target.value })} /></Field>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                    <Field label="Date d’embauche"><Input type="date" className="min-w-0 max-w-full" value={String(form.hire_date || '').slice(0, 10)} onChange={(event) => patch({ hire_date: event.target.value })} /></Field>
+                    <Field label="Fin de contrat"><Input type="date" className="min-w-0 max-w-full" value={String(form.date_fin_contrat || '').slice(0, 10)} onChange={(event) => patch({ date_fin_contrat: event.target.value })} /></Field>
                     <Field label="Type">
                       <Select value={form.type_employe || 'Employé'} onValueChange={(value) => patch({ type_employe: value })}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -320,13 +329,16 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
                       <li>Faire des demandes (congé, absence…)</li>
                       <li>Recevoir des notifications</li>
                     </ul>
-                    <label className="mt-3 flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={creerCompte} onChange={(event) => setCreerCompte(event.target.checked)} className="accent-[#c9a227]" />
-                      Envoyer une invitation pour créer le compte
-                    </label>
+                    <div className="mt-3 rounded-xl border border-[#e4b54a]/50 bg-[#fffaf0] p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                      <p className="text-sm text-[#1c1403] flex-1">Le compte se crée quand la personne invitée ouvre son lien et choisit un mot de passe.</p>
+                      <Button type="button" onClick={() => save(false, true)} className={cn(GOLD, 'shrink-0')}>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Créer le compte
+                      </Button>
+                    </div>
                   </Card>
                   <Card icon={Shield} title="Rôle du compte">
-                    <div className="grid sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
                       {[
                         ['agent', 'Collaborateur (agent)', 'Espace collaborateur'],
                         ['superviseur', 'Superviseur', 'Espace collaborateur et suivi d’équipe'],
@@ -377,10 +389,14 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
           </div>
         </div>
 
-        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 border-t bg-white">
-          <Button type="button" variant="outline" onClick={onClose} className="sm:mr-auto">Annuler</Button>
-          <Button type="button" variant="outline" onClick={() => save(true)}>Enregistrer en brouillon</Button>
-          <Button type="button" onClick={() => save(false)} className={GOLD}>{agent ? 'Enregistrer' : 'Créer le collaborateur'}</Button>
+        <div className="shrink-0 flex flex-wrap items-center gap-2 px-4 py-3 border-t bg-white">
+          <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto sm:mr-auto">Annuler</Button>
+          <Button type="button" variant="outline" onClick={() => save(true)} className="w-full sm:w-auto">Enregistrer en brouillon</Button>
+          <Button type="button" variant="outline" onClick={() => save(false)} className="w-full sm:w-auto">{agent ? 'Enregistrer' : 'Créer le collaborateur'}</Button>
+          <Button type="button" onClick={() => save(false, true)} className={cn(GOLD, 'w-full sm:w-auto')}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Créer le compte
+          </Button>
         </div>
       </div>
     </div>
@@ -404,7 +420,7 @@ function Card({ icon: Icon, title, text, children }) {
 
 function Field({ label, children }) {
   return (
-    <label className="block space-y-1.5">
+    <label className="block min-w-0 space-y-1.5">
       <span className="text-xs font-medium text-slate-500">{label}</span>
       {children}
     </label>

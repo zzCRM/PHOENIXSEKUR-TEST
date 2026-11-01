@@ -9,6 +9,16 @@ html, body, #root {
   overflow-x: hidden;
 }
 
+/* Champ date : largeur minimale native qui déborde sur la case d'à côté. */
+input[type='date'],
+input[type='datetime-local'],
+input[type='time'],
+input[type='month'],
+input[type='week'] {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* iPhone notch / Dynamic Island — constant() pour iOS < 11.2, env() ensuite */
 .safe-top {
   padding-top: constant(safe-area-inset-top);

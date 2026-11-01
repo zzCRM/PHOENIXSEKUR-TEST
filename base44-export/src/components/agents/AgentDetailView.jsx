@@ -43,7 +43,7 @@ function StarRating({ value, onChange }) {
   );
 }
 
-export default function AgentDetailView({ agent, onClose }) {
+export default function AgentDetailView({ agent, onClose, onInvited }) {
   const [activeSection, setActiveSection] = useState('general');
   const [formData, setFormData] = useState({ ...agent });
   const [photoFile, setPhotoFile] = useState(null);
@@ -66,8 +66,7 @@ export default function AgentDetailView({ agent, onClose }) {
     },
     onSuccess: ({ invite }) => {
       qc.invalidateQueries({ queryKey: ['agents'] });
-      if (invite?.email_sent) toast.success('Fiche enregistrée — invitation envoyée');
-      else if (invite?.invite_url) toast.warning('Fiche enregistrée — invitation créée, email non envoyé');
+      if (invite) onInvited?.(invite);
       else toast.success('Fiche enregistrée');
       onClose();
     },
@@ -508,6 +507,26 @@ export default function AgentDetailView({ agent, onClose }) {
             </div>
             <div className="border-t border-border p-3 sm:p-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 sm:justify-end bg-background shrink-0">
               <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Annuler</Button>
+              <Button
+                type="button"
+                disabled={updateMut.isPending}
+                className="w-full sm:w-auto bg-[#e4b54a] hover:bg-[#d7a63a] text-[#1c1403]"
+                onClick={() => {
+                  if (!formData.email) {
+                    toast.error('Indiquez un email pour créer le compte');
+                    return;
+                  }
+                  const droits_portail = mergeAgentDroits(formData);
+                  updateMut.mutate({
+                    ...formData,
+                    ...droits_portail,
+                    droits_portail,
+                    creer_compte_phoenix: true,
+                  });
+                }}
+              >
+                Créer le compte
+              </Button>
               <Button
                 onClick={() => {
                   if (creerComptePhoenix && !formData.email) {
