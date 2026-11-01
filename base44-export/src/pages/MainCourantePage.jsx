@@ -5,7 +5,8 @@ import { Plus, Download, Search } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { exportMainCourantePdf } from '@/lib/mainCourantePdf';
+import { toast } from 'sonner';
+import { downloadMainCouranteReport } from '@/lib/downloadMainCouranteReport';
 import { useCompany } from '@/lib/useCompany';
 import EventTypeFilter from '@/components/main-courante/EventTypeFilter';
 import MainCouranteTable from '@/components/main-courante/MainCouranteTable';
@@ -76,18 +77,16 @@ export default function MainCourantePage() {
   }, [merged, selectedSites, dateRange, selectedCodes, search]);
 
   const exportPDF = async () => {
-    let firstClient = null;
-    if (filtered[0]?.client_id) {
-      try { firstClient = await base44.entities.Client.get(filtered[0].client_id); } catch { /* ignore */ }
+    try {
+      await downloadMainCouranteReport({
+        start: dateRange.start,
+        end: dateRange.end,
+        siteIds: selectedSites.size ? [...selectedSites] : undefined,
+        filename: 'rapport-main-courante.pdf',
+      });
+    } catch (error) {
+      toast.error(error.message || 'Génération du rapport impossible');
     }
-    await exportMainCourantePdf({
-      entries: filtered,
-      companyId,
-      title: 'Main courante',
-      subtitle: `Période : ${dateRange.start || '—'} → ${dateRange.end || '—'} — Sites : ${selectedSites.size === 0 ? 'Tous' : sites.filter((s) => selectedSites.has(s.id)).map((s) => s.name).join(', ')}`,
-      filename: 'main-courante-export.pdf',
-      client: firstClient,
-    });
   };
 
   return (

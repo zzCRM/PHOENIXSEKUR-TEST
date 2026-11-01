@@ -1,9 +1,20 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { sendReportEmail } from '../lib/report-email.js';
-import { getEntityDelegate } from '../lib/prisma.js';
+import { getEntityDelegate, toApiRecord } from '../lib/prisma.js';
 import { runScheduledReports } from '../lib/report-scheduler.js';
-import { escapeHtml, reportCompanyId } from '../lib/access.js';
+import { buildScope, escapeHtml, reportCompanyId } from '../lib/access.js';
+import {
+  addIsoDays,
+  buildMainCouranteLines,
+  parisNow,
+  renderMainCourantePdf,
+} from '../lib/mainCouranteReport.js';
+
+async function loadRows(entityName, companyId) {
+  const rows = await getEntityDelegate(entityName).findMany({ where: { companyId } });
+  return rows.map(toApiRecord);
+}
 
 const router = Router();
 
@@ -83,6 +94,73 @@ router.post('/send-email', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('Report email error:', err);
     res.status(500).json({ error: 'Envoi du rapport impossible' });
+  }
+});
+
+router.post('/main-courante.pdf', requireAuth, async (req, res) => {
+  try {
+    const role = req.user.role;
+    const allowedRole = role === 'admin' || role === 'supervisor' || role === 'superadmin' || role === 'client';
+    if (!allowedRole) return res.status(403).json({ error: 'Accès refusé' });
+
+    const companyId = role === 'superadmin'
+      ? (req.body?.company_id || req.user.companyId)
+      : req.user.companyId;
+    if (!companyId) return res.status(403).json({ error: 'Accès refusé' });
+
+    const clock = parisNow();
+    const end = req.body?.end || clock.iso;
+    const start = req.body?.start || addIsoDays(end, -1);
+    const [entries, prises, executions, sites, clients, missions, settingsRows] = await Promise.all([
+      loadRows('MainCourante', companyId),
+      loadRows('PriseDeService', companyId),
+      loadRows('RondeExecution', companyId),
+      loadRows('Site', companyId),
+      loadRows('Client', companyId),
+      loadRows('Mission', companyId),
+      loadRows('CompanySettings', companyId),
+    ]);
+
+    let visibleSites = sites;
+    if (role === 'client') {
+      const scope = buildScope({ ...req.user, id: req.user.sub }, { clients, sites });
+      visibleSites = sites.filter((site) => scope.siteIds.has(site.id));
+    }
+    const requested = [req.body?.site_id, ...(req.body?.site_ids || [])].filter(Boolean);
+    if (requested.length) {
+      const wanted = new Set(requested);
+      visibleSites = visibleSites.filter((site) => wanted.has(site.id));
+    }
+    if (role === 'client' && !visibleSites.length) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const lines = buildMainCouranteLines({
+      entries,
+      prises,
+      executions,
+      missions,
+      start,
+      end,
+      siteIds: visibleSites.map((site) => site.id),
+    });
+    const pdf = renderMainCourantePdf({
+      company: settingsRows[0] || {},
+      sites: visibleSites,
+      clients,
+      lines,
+      start,
+      end,
+      editionLabel: clock.label,
+      editionTime: clock.time,
+    });
+    const filename = `rapport-main-courante-${start}-${end}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error('Main courante PDF error:', err);
+    res.status(500).json({ error: 'Génération du rapport impossible' });
   }
 });
 

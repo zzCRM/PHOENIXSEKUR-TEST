@@ -23,7 +23,7 @@ function getTransporter() {
 }
 
 export async function sendReportEmail({
-  to, subject, text, html, pdfBase64, filename,
+  to, subject, text, html, pdfBase64, filename, attachments: extraAttachments,
   companyName, start, end, modules, stats,
 }) {
   const from = process.env.SMTP_FROM || process.env.SMTP_USER;
@@ -60,6 +60,14 @@ export async function sendReportEmail({
     content: Buffer.from(pdfBase64, 'base64'),
     contentType: 'application/pdf',
   }] : [];
+  for (const file of extraAttachments || []) {
+    if (!file?.content) continue;
+    attachments.push({
+      filename: file.filename || 'rapport-main-courante.pdf',
+      content: Buffer.isBuffer(file.content) ? file.content : Buffer.from(file.content, 'base64'),
+      contentType: 'application/pdf',
+    });
+  }
 
   await mailer.sendMail({
     from,

@@ -1,33 +1,29 @@
 import { getEntityDelegate, toApiRecord } from './prisma.js';
-import { sendReportEmail } from './report-email.js';
+import { sendReportEmail, buildReportSummaryText } from './report-email.js';
+import { addIsoDays, parisNow, pdfsForSites } from './mainCouranteReport.js';
 
-function periodDates(freq) {
-  const end = new Date();
-  const start = new Date(end);
-  if (freq === 'daily') start.setDate(start.getDate() - 1);
-  else if (freq === 'weekly') start.setDate(start.getDate() - 7);
-  else start.setDate(start.getDate() - 30);
-  const fmt = (d) => d.toISOString().slice(0, 10);
-  return { start: fmt(start), end: fmt(end) };
+function periodDates(freq, now = parisNow()) {
+  const end = now.iso;
+  const back = freq === 'daily' ? -1 : freq === 'monthly' ? -30 : -7;
+  return { start: addIsoDays(end, back), end };
 }
 
-function shouldRunNow(schedule) {
+function shouldRunNow(schedule, now = parisNow()) {
   if (!schedule?.enabled) return false;
-  const now = new Date();
-  const hour = now.getHours();
-  const day = now.getDay();
-  const date = now.getDate();
-  // Fenêtre 7h–8h pour éviter de rater le créneau si le tick tombe après :00
-  if (hour !== 7) return false;
+  if (now.hour !== 7) return false;
   if (schedule.frequency === 'daily') return true;
-  if (schedule.frequency === 'weekly') return day === 1;
-  if (schedule.frequency === 'monthly') return date === 1;
+  if (schedule.frequency === 'weekly') return now.weekday === 1;
+  if (schedule.frequency === 'monthly') return now.dayOfMonth === 1;
   return false;
 }
 
-function alreadySentToday(schedule) {
-  const today = new Date().toISOString().slice(0, 10);
-  return schedule?.last_sent_date === today;
+function alreadySentToday(schedule, now = parisNow()) {
+  return schedule?.last_sent_date === now.iso;
+}
+
+async function loadRows(entityName, companyId) {
+  const rows = await getEntityDelegate(entityName).findMany({ where: { companyId } });
+  return rows.map(toApiRecord);
 }
 
 async function countForClient(entityName, companyId, clientId, start, end) {
@@ -41,6 +37,12 @@ async function countForClient(entityName, companyId, clientId, start, end) {
     }
     return true;
   }).length;
+}
+
+function reportText(companyName, start, end, modules, stats, fileCount) {
+  const base = buildReportSummaryText({ companyName, start, end, modules, stats });
+  if (!fileCount) return base;
+  return `${base}\n\nLe rapport de main courante est joint en PDF (prise de service, rondes, points de contrôle).`;
 }
 
 function clientWantsReports(client) {
@@ -64,7 +66,7 @@ function collectClientEmails(client) {
 
 async function markLastSent(settingsRow, schedule) {
   const delegate = getEntityDelegate('CompanySettings');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = parisNow().iso;
   const merged = {
     ...(typeof settingsRow.data === 'object' ? settingsRow.data : {}),
     report_schedule: { ...schedule, last_sent_date: today },
@@ -92,12 +94,13 @@ export async function runScheduledReports({ force = false, companyId = null } = 
     for (const row of allSettings) {
       const record = toApiRecord(row);
       const schedule = record.report_schedule || {};
-      if (!force && !shouldRunNow(schedule)) continue;
-      if (!force && alreadySentToday(schedule)) continue;
+      const clock = parisNow();
+      if (!force && !shouldRunNow(schedule, clock)) continue;
+      if (!force && alreadySentToday(schedule, clock)) continue;
       if (!schedule.enabled) continue;
 
       const companyId = row.companyId;
-      const { start, end } = periodDates(schedule.frequency || 'weekly');
+      const { start, end } = periodDates(schedule.frequency || 'weekly', clock);
       const modules = schedule.modules || ['main_courante', 'rondes', 'incidents'];
       const companyName = record.company_name || 'Phoenix Sekur';
 
@@ -107,6 +110,29 @@ export async function runScheduledReports({ force = false, companyId = null } = 
 
       const sendToClients = schedule.send_to_clients !== false;
       const requireOptIn = schedule.only_opt_in_clients !== false;
+      const [entries, prises, executions, sites, missions] = await Promise.all([
+        loadRows('MainCourante', companyId),
+        loadRows('PriseDeService', companyId),
+        loadRows('RondeExecution', companyId),
+        loadRows('Site', companyId),
+        loadRows('Mission', companyId),
+      ]);
+      const reportPdfs = pdfsForSites({
+        company: record,
+        sites,
+        clients,
+        entries,
+        prises,
+        executions,
+        missions,
+        start,
+        end,
+        editionLabel: clock.label,
+        editionTime: '07:00',
+      });
+      const filesFor = (clientId) => reportPdfs
+        .filter((file) => !clientId || file.clientId === clientId)
+        .map((file) => ({ filename: file.filename, content: file.content }));
 
       if (sendToClients) {
         for (const client of clients) {
@@ -129,6 +155,7 @@ export async function runScheduledReports({ force = false, companyId = null } = 
               : 0,
           };
 
+          const attachments = filesFor(client.id);
           for (const to of emails) {
             const result = await sendReportEmail({
               to,
@@ -137,6 +164,8 @@ export async function runScheduledReports({ force = false, companyId = null } = 
               end,
               modules,
               stats,
+              attachments,
+              text: reportText(client.company_name || companyName, start, end, modules, stats, attachments.length),
             });
             if (result.sent) sentCount += 1;
           }
@@ -153,6 +182,7 @@ export async function runScheduledReports({ force = false, companyId = null } = 
             incidents: await countForClient('Alerte', companyId, null, start, end),
             planning: await countForClient('Mission', companyId, null, start, end),
           };
+          const companyFiles = filesFor(null);
           await sendReportEmail({
             to: companyEmail,
             companyName,
@@ -160,6 +190,8 @@ export async function runScheduledReports({ force = false, companyId = null } = 
             end,
             modules,
             stats,
+            attachments: companyFiles,
+            text: reportText(companyName, start, end, modules, stats, companyFiles.length),
           });
           sentCount += 1;
         }
@@ -170,19 +202,23 @@ export async function runScheduledReports({ force = false, companyId = null } = 
         .split(',')
         .map((e) => e.trim())
         .filter(Boolean);
+      const extraFiles = filesFor(null);
       for (const to of extra) {
+        const stats = {
+          rondes: await countForClient('RondeExecution', companyId, null, start, end),
+          main_courante: await countForClient('MainCourante', companyId, null, start, end),
+          incidents: await countForClient('Alerte', companyId, null, start, end),
+          planning: await countForClient('Mission', companyId, null, start, end),
+        };
         await sendReportEmail({
           to,
           companyName,
           start,
           end,
           modules,
-          stats: {
-            rondes: await countForClient('RondeExecution', companyId, null, start, end),
-            main_courante: await countForClient('MainCourante', companyId, null, start, end),
-            incidents: await countForClient('Alerte', companyId, null, start, end),
-            planning: await countForClient('Mission', companyId, null, start, end),
-          },
+          stats,
+          attachments: extraFiles,
+          text: reportText(companyName, start, end, modules, stats, extraFiles.length),
         });
         sentCount += 1;
       }

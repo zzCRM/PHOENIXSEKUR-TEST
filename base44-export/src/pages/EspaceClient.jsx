@@ -15,7 +15,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay 
 import { fr } from 'date-fns/locale';
 import { useCompany } from '@/lib/useCompany';
 import { toast } from 'sonner';
-import { exportMainCourantePdf } from '@/lib/mainCourantePdf';
+import { downloadMainCouranteReport } from '@/lib/downloadMainCouranteReport';
 
 const TYPE_CONFIG = {
   arrivee: { label: 'Arrivée', color: 'text-green-600' },
@@ -211,13 +211,10 @@ export default function EspaceClient() {
                     variant="outline"
                     size="sm"
                     className="gap-1"
-                    disabled={filteredMC.length === 0}
-                    onClick={() => exportMainCourantePdf({
-                      entries: filteredMC.map((e) => ({ ...e, event_label: (TYPE_CONFIG[e.type] || TYPE_CONFIG.autre).label })),
-                      companyId,
-                      title: 'Main courante client',
-                      filename: 'main-courante-client.pdf',
-                    })}
+                    onClick={() => downloadMainCouranteReport({
+                      siteId: selectedSite === 'all' ? undefined : selectedSite,
+                      filename: 'rapport-main-courante.pdf',
+                    }).catch((error) => toast.error(error.message || 'Génération du rapport impossible'))}
                   >
                     <Download className="w-3.5 h-3.5" /> PDF
                   </Button>
