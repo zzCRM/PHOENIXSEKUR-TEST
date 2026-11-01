@@ -1,11 +1,11 @@
 #!/bin/bash
 # Installation automatique Phoenix Sekur sur VPS OVH (Ubuntu 24.04)
 # Usage (sur le VPS, en root ou avec sudo) :
-#   curl -fsSL https://raw.githubusercontent.com/zzCRM/PHOENIXSEKUR-TEST/cursor/migrate-off-base44-6bc2/scripts/bootstrap-ovh.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/zzCRM/PHOENIXSEKUR-TEST/main/scripts/bootstrap-ovh.sh | sudo bash
 set -euo pipefail
 
 REPO="https://github.com/zzCRM/PHOENIXSEKUR-TEST.git"
-BRANCH="cursor/migrate-off-base44-6bc2"
+BRANCH="main"
 INSTALL_DIR="/opt/phoenixsekur"
 DOMAIN="${DOMAIN:-app.phoenixsekur.com}"
 ACME_EMAIL="${ACME_EMAIL:-admin@phoenixsekur.fr}"

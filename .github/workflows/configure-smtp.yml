@@ -34,8 +34,8 @@ jobs:
             sudo git config --global --add safe.directory /opt/phoenixsekur
             cd /opt/phoenixsekur
             sudo git fetch origin
-            sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
-            sudo git pull
+            sudo git checkout main
+            sudo git reset --hard origin/main
             sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
               SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" \
               bash scripts/ensure-smtp-env.sh /opt/phoenixsekur/.env.production

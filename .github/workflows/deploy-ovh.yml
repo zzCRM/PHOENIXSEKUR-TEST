@@ -4,7 +4,7 @@ name: Deploy Phoenix Sekur (OVH)
 
 on:
   push:
-    branches: [main, cursor/migrate-off-base44-6bc2]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -34,8 +34,8 @@ jobs:
             sudo git config --global --add safe.directory /opt/phoenixsekur
             cd /opt/phoenixsekur
             sudo git fetch origin
-            sudo git checkout cursor/migrate-off-base44-6bc2 || sudo git checkout main
-            sudo git pull
+            sudo git checkout main
+            sudo git reset --hard origin/main
             if [ -n "$SMTP_PASS" ]; then
               sudo SMTP_HOST="$SMTP_HOST" SMTP_PORT="$SMTP_PORT" SMTP_USER="$SMTP_USER" \
                 SMTP_FROM="$SMTP_FROM" SMTP_PASS="$SMTP_PASS" APP_URL="https://app.phoenixsekur.com" \
