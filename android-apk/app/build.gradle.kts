@@ -10,13 +10,30 @@ android {
         applicationId = "com.phoenixsekur.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-essai"
+        versionCode = 2
+        versionName = "0.1.1-essai"
+    }
+
+    signingConfigs {
+        create("essai") {
+            storeFile = file("phoenix-essai.jks")
+            storePassword = "phoenix-essai"
+            keyAlias = "phoenix"
+            keyPassword = "phoenix-essai"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("essai")
+        }
         release {
             isMinifyEnabled = false
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("essai")
         }
     }
 
