@@ -1,16 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Search, Plus, CalendarDays, Download, FileText, LayoutGrid, MapPin } from 'lucide-react';
+import { Plus, CalendarDays } from 'lucide-react';
 import MonthPlanningHome from '@/components/planning/MonthPlanningHome';
 import PlanningVacationSheet from '@/components/planning/PlanningVacationSheet';
 import PlanningMapView from '@/components/planning/PlanningMapView';
+import PlanningCommand from '@/components/planning/PlanningCommand';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
-  addMonths, subMonths, getDay, isToday, isSameMonth,
+  addMonths, addDays, startOfWeek, endOfWeek, getDay, isToday, isSameMonth,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import AjoutServiceModal from '@/components/planning/AjoutServiceModal';
@@ -19,6 +18,8 @@ import { serviceDurationHours } from '@/lib/serviceQualification';
 import { exportPlanningPdf } from '@/lib/planningPdfExport';
 import { cn } from '@/lib/utils';
 import { useCompany } from '@/lib/useCompany';
+import { accountDisplayName } from '@/lib/agentPortal';
+import { normalizeDateKey } from '@/lib/recurrenceExpand';
 import { useNavigate } from 'react-router-dom';
 import PlanningContextMenu from '@/components/planning/PlanningContextMenu';
 import { toast } from 'sonner';
@@ -35,18 +36,19 @@ function getDayOfWeekLabel(date) {
 }
 
 export default function PlanningAvance() {
-  const { companyId, isAdmin } = useCompany();
+  const { companyId, user } = useCompany();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
-  const [view, setView] = useState('carte');
+  const [view, setView] = useState('planning');
+  const [period, setPeriod] = useState('semaine');
   const [search, setSearch] = useState('');
+  const [siteFilter, setSiteFilter] = useState('');
+  const [agentFilter, setAgentFilter] = useState('');
+  const [serviceFilter, setServiceFilter] = useState('');
+  const [hideAbsences, setHideAbsences] = useState(false);
   const [showAjoutService, setShowAjoutService] = useState(false);
   const [sheet, setSheet] = useState(null);
-  const [exportOpen, setExportOpen] = useState(false);
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const year = currentDate.getFullYear();
 
   const feriesMap = useMemo(() => ({
@@ -77,6 +79,16 @@ export default function PlanningAvance() {
     queryFn: () => base44.entities.Site.filter({ company_id: companyId }),
     enabled: !!companyId,
   });
+  const { data: agents = [] } = useQuery({
+    queryKey: ['agents', companyId],
+    queryFn: () => base44.entities.Agent.filter({ company_id: companyId }),
+    enabled: !!companyId,
+  });
+  const { data: conges = [] } = useQuery({
+    queryKey: ['conges', companyId],
+    queryFn: () => base44.entities.Conge.filter({ company_id: companyId }, '-created_date', 200),
+    enabled: !!companyId,
+  });
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [contextMenu, setContextMenu] = useState(null);
@@ -102,12 +114,19 @@ export default function PlanningAvance() {
     return map;
   }, [prises]);
 
-  const grouped = useMemo(() => {
-    const monthMissions = missions.filter(m => {
-      if (!m.date) return false;
-      const d = new Date(m.date.split('T')[0]);
-      return d >= monthStart && d <= monthEnd;
+  const visibleDays = useMemo(() => {
+    if (period === 'jour') return [currentDate];
+    if (period === 'mois') return eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) });
+    return eachDayOfInterval({
+      start: startOfWeek(currentDate, { weekStartsOn: 1 }),
+      end: endOfWeek(currentDate, { weekStartsOn: 1 }),
     });
+  }, [currentDate, period]);
+  const visibleKey = visibleDays.map((day) => format(day, 'yyyy-MM-dd')).join('|');
+
+  const grouped = useMemo(() => {
+    const keys = new Set(visibleKey.split('|').filter(Boolean));
+    const monthMissions = missions.filter((m) => keys.has(normalizeDateKey(m.date)));
 
     const map = {};
     monthMissions.forEach(m => {
@@ -127,14 +146,49 @@ export default function PlanningAvance() {
     });
 
     return map;
-  }, [missions, monthStart, monthEnd]);
+  }, [missions, visibleKey]);
 
   const filteredMissions = useMemo(() => {
-    if (!search) return missions;
-    const s = search.toLowerCase();
-    return missions.filter((m) =>
-      [m.client_name, m.site_name, m.agent_name, m.title].some((v) => String(v || '').toLowerCase().includes(s)));
-  }, [missions, search]);
+    const needle = search.trim().toLowerCase();
+    return missions.filter((mission) => {
+      if (siteFilter && mission.site_id !== siteFilter && mission.site_name !== siteFilter) return false;
+      if (agentFilter && mission.agent_id !== agentFilter && mission.agent_name !== agentFilter) return false;
+      if (serviceFilter && (mission.type || mission.title || '') !== serviceFilter) return false;
+      if (!needle) return true;
+      return [mission.client_name, mission.site_name, mission.agent_name, mission.title, mission.type]
+        .some((value) => String(value || '').toLowerCase().includes(needle));
+    });
+  }, [missions, search, siteFilter, agentFilter, serviceFilter]);
+
+  const optionOf = (pairs) => [...pairs.entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+  const siteOptions = optionOf(missions.reduce((map, mission) => {
+    const value = mission.site_id || mission.site_name;
+    if (value) map.set(value, mission.site_name || 'Site');
+    return map;
+  }, new Map()));
+  const agentOptions = optionOf(missions.reduce((map, mission) => {
+    const value = mission.agent_id || mission.agent_name;
+    if (value) map.set(value, mission.agent_name || 'Agent');
+    return map;
+  }, new Map()));
+  const serviceOptions = optionOf(missions.reduce((map, mission) => {
+    const value = mission.type || mission.title;
+    if (value) map.set(value, value);
+    return map;
+  }, new Map()));
+  const rangeLabel = (() => {
+    if (!visibleDays.length) return '';
+    const label = (day, pattern) => {
+      const text = format(day, pattern, { locale: fr });
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    };
+    if (period === 'jour') return label(visibleDays[0], 'EEEE d MMMM yyyy');
+    if (period === 'mois') return label(visibleDays[0], 'MMMM yyyy');
+    return `${label(visibleDays[0], 'EEE d MMM')} – ${label(visibleDays[visibleDays.length - 1], 'EEE d MMM yyyy')}`;
+  })();
+  const userInitial = (accountDisplayName(user) || user?.email || 'P').trim().charAt(0).toUpperCase() || 'P';
 
   const filteredGroups = useMemo(() => {
     if (!search) return grouped;
@@ -150,8 +204,6 @@ export default function PlanningAvance() {
     });
     return result;
   }, [grouped, search]);
-
-  const visibleDays = days;
 
   const feriesDuMois = useMemo(() => {
     return visibleDays
@@ -173,7 +225,6 @@ export default function PlanningAvance() {
     } catch (e) {
       toast.error('Échec export PDF : ' + (e.message || ''));
     }
-    setExportOpen(false);
   };
 
   const handleContextAction = async (action, missions) => {
@@ -220,14 +271,8 @@ export default function PlanningAvance() {
     }
   };
 
-  const goToday = () => {
-    const now = new Date();
-    setCurrentDate(now);
-    setSelectedDay(now);
-  };
-
   return (
-    <div className={cn('relative', view === 'carte' ? 'space-y-0' : 'space-y-4')}>
+    <div className="-m-3 sm:-m-4 xl:-m-8 min-h-[calc(100dvh-4.5rem)] bg-[#f4f6fb] px-3 py-4 sm:px-5 xl:px-6 pb-24 xl:pb-6">
       <AjoutServiceModal
         open={showAjoutService}
         onClose={() => { setShowAjoutService(false); setEditMission(null); }}
@@ -244,157 +289,82 @@ export default function PlanningAvance() {
         onAction={(action, list) => handleContextAction(action, list)}
       />
 
-      {view === 'carte' && (
-        <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between gap-2 pointer-events-none">
-          <div className="pointer-events-auto flex rounded-2xl bg-white/90 backdrop-blur-md shadow-lg border border-white/70 p-0.5">
-            <button type="button" onClick={() => setView('carte')} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium bg-slate-900 text-white">
-              <MapPin className="w-4 h-4" /> Carte
-            </button>
-            <button type="button" onClick={() => setView('calendrier')} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium text-slate-600">
-              <CalendarDays className="w-4 h-4" /> Calendrier
-            </button>
-            <button type="button" onClick={() => setView('grille')} className="hidden xl:inline-flex items-center gap-1.5 px-3 h-9 rounded-xl text-sm font-medium text-slate-600">
-              <LayoutGrid className="w-4 h-4" /> Tableau
-            </button>
-          </div>
-          <Button onClick={() => setShowAjoutService(true)} className="pointer-events-auto gap-1.5 h-10 shrink-0 shadow-lg">
-            <Plus className="w-4 h-4" /> Ajouter
-          </Button>
-        </div>
-      )}
-
-      {view !== 'carte' && (
-      <div className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight capitalize">
-              {format(currentDate, 'MMMM yyyy', { locale: fr })}
-            </h1>
-            <p className="text-sm text-muted-foreground">Carte des sites — glissez les tickets du jour</p>
-          </div>
-          <Button onClick={() => setShowAjoutService(true)} className="gap-1.5 h-10 shrink-0">
-            <Plus className="w-4 h-4" /> Ajouter
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto tabs-scroll pb-0.5">
-          <div className="flex rounded-xl border border-border bg-muted/40 p-0.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setView('carte')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium',
-                view === 'carte' ? 'bg-background shadow-sm' : 'text-muted-foreground',
-              )}
-            >
-              <MapPin className="w-4 h-4" /> Carte
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('calendrier')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium',
-                view === 'calendrier' ? 'bg-background shadow-sm' : 'text-muted-foreground',
-              )}
-            >
-              <CalendarDays className="w-4 h-4" /> Calendrier
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('grille')}
-              className={cn(
-                'hidden xl:inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-medium',
-                view === 'grille' ? 'bg-background shadow-sm' : 'text-muted-foreground',
-              )}
-            >
-              <LayoutGrid className="w-4 h-4" /> Tableau
-            </button>
-          </div>
-          <div className="flex items-center border rounded-xl bg-card overflow-hidden shrink-0">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" className="h-9 px-2 rounded-none text-sm" onClick={goToday}>
-              Aujourd'hui
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="relative min-w-[9rem] flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Site, agent, client…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 rounded-xl" />
-          </div>
-          <div className="relative shrink-0">
-            <Button variant="outline" className="h-9 gap-2 rounded-xl" onClick={() => setExportOpen((v) => !v)}>
-              <Download className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span>
-            </Button>
-            {exportOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 bg-white border rounded-lg shadow-lg w-56 py-1">
-                  <button type="button" onClick={() => handleExport('site')} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Par site
-                  </button>
-                  <button type="button" onClick={() => handleExport('collaborateur')} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Par collaborateur
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Bandeau jours fériés */}
-        {view !== 'carte' && feriesDuMois.length > 0 && (
-          <div className="flex items-start gap-2 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+      <PlanningCommand
+        view={view}
+        onView={setView}
+        period={period}
+        onPeriod={setPeriod}
+        rangeLabel={rangeLabel}
+        days={visibleDays}
+        missions={filteredMissions}
+        agents={agents}
+        conges={conges}
+        prises={prises}
+        search={search}
+        onSearch={setSearch}
+        siteFilter={siteFilter}
+        onSiteFilter={setSiteFilter}
+        siteOptions={siteOptions}
+        agentFilter={agentFilter}
+        onAgentFilter={setAgentFilter}
+        agentOptions={agentOptions}
+        serviceFilter={serviceFilter}
+        onServiceFilter={setServiceFilter}
+        serviceOptions={serviceOptions}
+        hideAbsences={hideAbsences}
+        onHideAbsences={setHideAbsences}
+        onShift={(dir) => setCurrentDate((date) => (
+          period === 'jour' ? addDays(date, dir) : period === 'mois' ? addMonths(date, dir) : addDays(date, dir * 7)
+        ))}
+        onAdd={() => setShowAjoutService(true)}
+        onExport={handleExport}
+        onOpenMissions={(list, date) => setSheet({ missions: list, date })}
+        onAssign={(mission) => { setEditMission(mission); setShowAjoutService(true); }}
+        onLeaves={() => navigate('/conges')}
+        onGaps={() => navigate('/ecarts-horaires')}
+        userInitial={userInitial}
+      >
+        {feriesDuMois.length > 0 && view !== 'carte' && (
+          <div className="flex items-start gap-2 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
             <span className="font-semibold text-red-700 mt-0.5 shrink-0">Jours fériés :</span>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {feriesDuMois.map((f, i) => (
-                <span key={i} className="text-red-700">
-                  <span className="font-medium">{format(f.date, 'EEE d MMM', { locale: fr })}</span>
-                  <span className="text-red-500/80"> — {f.name}</span>
+              {feriesDuMois.map((item) => (
+                <span key={item.name + item.date.toISOString()} className="text-red-700">
+                  <span className="font-medium">{format(item.date, 'EEE d MMM', { locale: fr })}</span>
+                  <span className="text-red-500/80"> — {item.name}</span>
                 </span>
               ))}
             </div>
           </div>
         )}
-      </div>
-      )}
-
-      {view === 'carte' && (
-        <div className="-mx-3 sm:-mx-4 xl:mx-0 -mb-3 sm:-mb-4 xl:mb-0">
+        {view === 'carte' && (
           <PlanningMapView
-            immersive
             missions={filteredMissions}
             sites={sites}
             prises={prises}
             selected={selectedDay}
             onSelectDay={setSelectedDay}
-            onOpenMission={(m) => setSheet({ missions: [m], date: selectedDay })}
+            onOpenMission={(mission) => setSheet({ missions: [mission], date: selectedDay })}
           />
-        </div>
-      )}
-
-      {view === 'calendrier' && (
-        <MonthPlanningHome
-          title="Vacations du mois"
-          missions={filteredMissions}
-          prises={prises}
-          sites={sites}
-          month={currentDate}
-          onMonthChange={setCurrentDate}
-          selected={selectedDay}
-          onSelect={setSelectedDay}
-          feriesMap={feriesMap}
-          hideMonthNav
-          onAdd={() => setShowAjoutService(true)}
-          onOpenMission={(m) => setSheet({ missions: [m], date: selectedDay })}
-        />
-      )}
-
-      {view === 'grille' && (
-      <div className="hidden xl:block overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        )}
+        {view === 'calendrier' && (
+          <MonthPlanningHome
+            title="Vacations du mois"
+            missions={filteredMissions}
+            prises={prises}
+            sites={sites}
+            month={currentDate}
+            onMonthChange={setCurrentDate}
+            selected={selectedDay}
+            onSelect={setSelectedDay}
+            feriesMap={feriesMap}
+            hideMonthNav
+            onAdd={() => setShowAjoutService(true)}
+            onOpenMission={(mission) => setSheet({ missions: [mission], date: selectedDay })}
+          />
+        )}
+        {view === 'tableau' && (
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="text-xs border-collapse w-full">
           <thead>
             <tr className="bg-muted/60">
@@ -540,7 +510,8 @@ export default function PlanningAvance() {
           </tbody>
         </table>
       </div>
-      )}
+        )}
+      </PlanningCommand>
 
       {contextMenu && (
         <PlanningContextMenu
@@ -551,8 +522,8 @@ export default function PlanningAvance() {
         />
       )}
 
-      {view === 'grille' && (
-      <div className="hidden xl:flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      {view === 'tableau' && (
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">Cellule :</span>
         <div className="flex items-center gap-1.5"><span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold">1</span><span className="w-px h-3 bg-gray-300" /><span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-bold">1</span><span>assignés / requis</span></div>
         <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded-sm bg-emerald-500" /><span>Planifiée</span></div>

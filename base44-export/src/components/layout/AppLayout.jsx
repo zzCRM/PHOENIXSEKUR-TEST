@@ -17,6 +17,7 @@ export default function AppLayout() {
   const agentPortal = isFieldAgent(user);
   const displayName = accountDisplayName(user);
   const commandHome = !agentPortal && location.pathname === '/';
+  const planningBoard = !agentPortal && location.pathname === '/planning';
 
   return (
     <div className={cn('min-h-[100dvh]', commandHome ? 'bg-[#070e1a]' : 'bg-background')}>
@@ -126,7 +127,7 @@ export default function AppLayout() {
         </header>
 
         {/* Barre desktop : déconnexion toujours accessible, hors tableau de bord */}
-        {!commandHome && (
+        {!commandHome && !planningBoard && (
         <div className="hidden xl:flex items-center justify-end gap-2 px-6 py-2 border-b border-gray-100 bg-white/80">
           <span className="text-xs text-muted-foreground truncate max-w-[280px]">
             {displayName || user?.email}
@@ -142,12 +143,13 @@ export default function AppLayout() {
         </div>
         )}
 
-        {!agentPortal && !commandHome && <CompanyHeader />}
+        {!agentPortal && !commandHome && !planningBoard && <CompanyHeader />}
 
         <main className={cn(
           'p-3 sm:p-4 xl:p-8 max-w-[100vw] overflow-x-hidden',
           !agentPortal && 'pb-24 xl:pb-8',
           commandHome && 'bg-[#070e1a]',
+          planningBoard && 'bg-[#f4f6fb]',
         )}>
           <Outlet />
         </main>
