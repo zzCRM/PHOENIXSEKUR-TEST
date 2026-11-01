@@ -394,6 +394,7 @@ export default function PlanningCommand({
 
         {view === 'planning' ? (
           <>
+            <h2 className="font-semibold mb-2">Planning des vacations</h2>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-3">
               <Legend dot="bg-emerald-400" label="Poste matin" />
               <Legend dot="bg-sky-400" label="Poste journée" />
