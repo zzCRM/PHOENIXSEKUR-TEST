@@ -1,5 +1,5 @@
 /* Service worker minimal — cache shell pour usage terrain */
-const CACHE = 'phoenix-sekur-v18';
+const CACHE = 'phoenix-sekur-v19';
 const ASSETS = [
   '/',
   '/login',
@@ -26,12 +26,30 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   if (request.url.includes('/api/')) return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  const networkFirst = request.mode === 'navigate'
+    || url.pathname === '/'
+    || url.pathname === '/sw.js'
+    || url.pathname.endsWith('.html');
+  if (networkFirst) {
+    event.respondWith(
+      fetch(request).then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(request)),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request).then((res) => {
       const clone = res.clone();
-      if (res.ok && request.url.startsWith(self.location.origin)) {
-        caches.open(CACHE).then((c) => c.put(request, clone));
-      }
+      if (res.ok) caches.open(CACHE).then((cache) => cache.put(request, clone));
       return res;
     }).catch(() => cached)),
   );
