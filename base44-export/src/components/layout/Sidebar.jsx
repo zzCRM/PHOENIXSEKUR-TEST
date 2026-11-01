@@ -102,6 +102,7 @@ const getNavGroups = (isPlatformOwner, isAdmin, isSuperAdminUser) => {
       label: 'Administration',
       items: [
         { icon: Users, label: 'Utilisateurs', shortLabel: 'Comptes', path: '/inviter' },
+        { icon: ShieldCheck, label: 'Rôles & permissions', shortLabel: 'Rôles', path: '/roles' },
         { icon: ShieldCheck, label: 'Facturation', path: '/facturation' },
       ],
     });

@@ -93,6 +93,32 @@ test('un agent ne supprime pas et ne crée pas de facture', () => {
   assert.equal(canWrite(agentA, 'Invoice', { id: 'i', company_id: 'co-a', client_id: 'client-a' }, 'create', scope(agentA)), false);
 });
 
+test('un droit de portail refusé bloque la lecture API', () => {
+  const fiche = { ...agents[0], droits_portail: { acces_planning: false } };
+  const mission = { id: 'm-a', company_id: 'co-a', agent_id: 'fiche-a', site_id: 'site-a' };
+  const scoped = { ...scope(agentA), ficheAgent: fiche };
+  assert.equal(canRead(agentA, 'Mission', mission, scoped), false);
+});
+
+test('un rôle sans la permission rondes bloque le superviseur, pas l’administrateur', () => {
+  const role = { id: 'role-1', status: 'actif', perimetre: 'site', grants: { 'planning.consulter': true } };
+  const fiche = { id: 'fiche-s', email: 'sup-a@exemple.test', company_id: 'co-a', role_ids: ['role-1'], site_ids: ['site-a'] };
+  const ronde = { id: 'r-1', company_id: 'co-a', site_id: 'site-a' };
+  const mission = { id: 'm-1', company_id: 'co-a', site_id: 'site-b' };
+  const scoped = { ficheAgent: fiche, ficheClient: null, siteIds: new Set(['site-a']), roles: [role] };
+  assert.equal(canRead(supervisorA, 'Ronde', ronde, scoped), false);
+  assert.equal(canRead(supervisorA, 'Mission', mission, scoped), false);
+  assert.equal(canRead(adminA, 'Ronde', ronde, scoped), true);
+});
+
+test('la matrice des rôles ne se modifie pas hors administrateur', () => {
+  const row = { id: 'roles-acces-co-a', company_id: 'co-a', kind: 'roles_acces', roles: [] };
+  assert.equal(canRead(agentA, 'CompanySettings', row, scope(agentA)), false);
+  assert.equal(canRead(adminA, 'CompanySettings', row, scope(adminA)), true);
+  assert.equal(canWrite(supervisorA, 'CompanySettings', row, 'update', scope(supervisorA)), false);
+  assert.equal(canWrite(adminA, 'CompanySettings', row, 'update', scope(adminA)), true);
+});
+
 test('le paramétrage PTI est réservé à l’administrateur de la société', () => {
   const pti = { id: 'pti-config-co-a', company_id: 'co-a', kind: 'pti_config' };
   const other = { id: 'pti-config-co-b', company_id: 'co-b', kind: 'pti_config' };

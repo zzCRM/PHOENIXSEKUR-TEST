@@ -12,6 +12,7 @@ import Dashboard from '@/pages/Dashboard';
 import PlanningAvance from '@/pages/PlanningAvance';
 import Missions from '@/pages/Missions';
 import Agents from '@/pages/Agents';
+import RolesPermissions from '@/pages/RolesPermissions';
 import Clients from '@/pages/Clients';
 import Sites from '@/pages/Sites';
 import HeuresSites from '@/pages/HeuresSites';
@@ -71,6 +72,7 @@ const AuthenticatedApp = () => {
         <Route path="/planning" element={<PlanningAvance />} />
         <Route path="/missions" element={<Missions />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/roles" element={<RolesPermissions />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/sites" element={<Sites />} />
         <Route path="/heures-sites" element={<HeuresSites />} />

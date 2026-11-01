@@ -1,3 +1,5 @@
+import { blockedByPermissions, outsidePerimetre } from '../../../shared/rolePermissions.js';
+
 const STAFF = new Set(['admin', 'supervisor']);
 const AGENT_ROLES = new Set(['agent', 'user', 'collaborateur']);
 const SENSITIVE = ['iban', 'bic', 'numero_securite_sociale', 'groupe_sanguin'];
@@ -91,13 +93,21 @@ export function isPtiConfigRecord(entity, record) {
   return typeof record.id === 'string' && record.id.startsWith('pti-config-');
 }
 
+export function isRolesConfigRecord(entity, record) {
+  if (entity !== 'CompanySettings' || !record) return false;
+  if (record.kind === 'roles_acces') return true;
+  return typeof record.id === 'string' && record.id.startsWith('roles-acces-');
+}
+
 export function canRead(user, entity, record, scope = { siteIds: new Set() }) {
   if (!user || !record) return false;
   if (!isSuperAdminRole(user) && record.company_id !== user.companyId) return false;
+  if (isRolesConfigRecord(entity, record) && user.role !== 'admin' && !isSuperAdminRole(user) && user.role !== 'supervisor') return false;
+  if (blockedByPermissions(user, entity, 'read', scope) || outsidePerimetre(user, record, scope)) return false;
   if (isSuperAdminRole(user) || user.role === 'admin' || user.role === 'supervisor') return true;
   if (isAgentRole(user)) {
     if (entity === 'Agent') return record.id === scope.ficheAgent?.id;
-    if (entity === 'CompanySettings') return !isPtiConfigRecord(entity, record);
+    if (entity === 'CompanySettings') return !isPtiConfigRecord(entity, record) && !isRolesConfigRecord(entity, record);
     if (entity === 'Site') return scope.siteIds.has(record.id) || ownAgent(record, user, scope);
     if (entity === 'Mission' || entity === 'PriseDeService' || entity === 'FicheDePaie' || entity === 'RondeExecution' || entity === 'Geolocation' || entity === 'Conge') {
       return ownAgent(record, user, scope);
@@ -116,7 +126,7 @@ export function canRead(user, entity, record, scope = { siteIds: new Set() }) {
     const clientId = scope.ficheClient?.id;
     if (!clientId) return false;
     if (entity === 'Client') return record.id === clientId;
-    if (entity === 'CompanySettings') return !isPtiConfigRecord(entity, record);
+    if (entity === 'CompanySettings') return !isPtiConfigRecord(entity, record) && !isRolesConfigRecord(entity, record);
     if (entity === 'Site') return scope.siteIds.has(record.id);
     if (entity === 'Mission' || entity === 'MainCourante' || entity === 'Ronde' || entity === 'BonIntervention') return onAgentSite(record, scope);
     if (entity === 'Invoice') return record.client_id === clientId;
@@ -136,6 +146,8 @@ export function canWrite(user, entity, record, operation, scope = { siteIds: new
   } else if (!user) return false;
   if (!isSuperAdminRole(user) && record.company_id !== user.companyId) return false;
   if (isPtiConfigRecord(entity, record) && user.role !== 'admin' && !isSuperAdminRole(user)) return false;
+  if (isRolesConfigRecord(entity, record) && user.role !== 'admin' && !isSuperAdminRole(user)) return false;
+  if (blockedByPermissions(user, entity, operation, scope) || outsidePerimetre(user, record, scope)) return false;
   if (user.role === 'admin') return true;
   if (user.role === 'supervisor') return operation !== 'delete' && entity !== 'Invoice' && entity !== 'FicheDePaie' && entity !== 'User';
   if (isAgentRole(user)) {

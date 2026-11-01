@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, Search, MoreHorizontal, Pencil, Trash2, Phone, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Users, Search, MoreHorizontal, Pencil, Trash2, Phone, Mail, Shield } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -130,6 +131,7 @@ export default function Agents() {
                   <div>
                     <p className="font-semibold">{agent.first_name} {agent.last_name}</p>
                     <StatusBadge status={agent.status} />
+                    {agent.draft && <span className="ml-1 text-[10px] uppercase text-amber-700">Brouillon</span>}
                   </div>
                 </div>
                 <DropdownMenu>
@@ -141,6 +143,12 @@ export default function Agents() {
                   <DropdownMenuContent align="end">
                    <DropdownMenuItem onClick={() => setSelectedAgent(agent)}>
                      <Pencil className="w-4 h-4 mr-2" /> Voir la fiche
+                   </DropdownMenuItem>
+                   <DropdownMenuItem onClick={() => setEditAgent(agent)}>
+                     <Pencil className="w-4 h-4 mr-2" /> Modifier
+                   </DropdownMenuItem>
+                   <DropdownMenuItem asChild>
+                     <Link to={`/roles?agent=${agent.id}`}><Shield className="w-4 h-4 mr-2" /> Gérer les accès</Link>
                    </DropdownMenuItem>
                    <DropdownMenuItem onClick={() => deleteMut.mutate(agent.id)} className="text-destructive">
                      <Trash2 className="w-4 h-4 mr-2" /> Supprimer

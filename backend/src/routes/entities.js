@@ -12,7 +12,8 @@ import {
 import { requireAuth } from '../middleware/auth.js';
 import { isSuperAdmin } from '../lib/superadmin.js';
 import { PLATFORM_COMPANY_ID, isPlatformCompanyId } from '../lib/tenant.js';
-import { buildScope, canRead, canWrite, presentRecord } from '../lib/access.js';
+import { buildScope, canRead, canWrite, findAgentFiche, presentRecord } from '../lib/access.js';
+import { ROLES_KIND } from '../../../shared/rolePermissions.js';
 
 const router = Router();
 
@@ -32,20 +33,26 @@ function assertCanAccessRow(req, row) {
 }
 
 async function scopeFor(req) {
-  if (!req.user || isSuperAdmin(req.user) || req.user.role === 'admin' || req.user.role === 'supervisor') {
-    return { ficheAgent: null, ficheClient: null, siteIds: new Set() };
+  if (!req.user || isSuperAdmin(req.user) || req.user.role === 'admin') {
+    return { ficheAgent: null, ficheClient: null, siteIds: new Set(), roles: [] };
   }
   const companyId = req.user.companyId;
-  const [agents, clients, sites] = await Promise.all([
+  const [agents, clients, sites, settings] = await Promise.all([
     getEntityDelegate('Agent').findMany({ where: { companyId } }),
     getEntityDelegate('Client').findMany({ where: { companyId } }),
     getEntityDelegate('Site').findMany({ where: { companyId } }),
+    getEntityDelegate('CompanySettings').findMany({ where: { companyId } }),
   ]);
-  return buildScope(req.user, {
-    agents: agents.map(toApiRecord),
+  const agentRecords = agents.map(toApiRecord);
+  const scope = buildScope(req.user, {
+    agents: agentRecords,
     clients: clients.map(toApiRecord),
     sites: sites.map(toApiRecord),
   });
+  if (!scope.ficheAgent) scope.ficheAgent = findAgentFiche(req.user, agentRecords);
+  const rolesRow = settings.map(toApiRecord).find((row) => row.kind === ROLES_KIND || String(row.id || '').startsWith('roles-acces-'));
+  scope.roles = Array.isArray(rolesRow?.roles) ? rolesRow.roles : [];
+  return scope;
 }
 
 async function recordAudit(req, action, entity, entityId, companyId) {

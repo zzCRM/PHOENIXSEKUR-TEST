@@ -1,60 +1,145 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  X, User, Shield, Briefcase, Monitor, Settings, Mail, CreditCard, Bell,
+} from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { CheckCircle2, Info, Lock, Shield } from 'lucide-react';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { useCompany } from '@/lib/useCompany';
 import { DEFAULT_DROITS_AGENT, DROITS_AGENT_OPTIONS, mergeAgentDroits } from '@/lib/agentPortal';
 
-const ROLE_OPTIONS = [
-  { value: 'agent', label: 'Agent', description: 'Accès espace collaborateur' },
-  { value: 'superviseur', label: 'Superviseur', description: 'Accès collaborateur + supervision équipe' },
+const TABS = [
+  { key: 'infos', label: 'Informations générales', icon: User },
+  { key: 'documents', label: 'Documents & habilitations', icon: Shield },
+  { key: 'emploi', label: 'Emploi & contrat', icon: Briefcase },
+  { key: 'acces', label: 'Accès & compte', icon: Monitor },
+  { key: 'prefs', label: 'Préférences', icon: Settings },
 ];
 
-const DROITS_AGENT = DROITS_AGENT_OPTIONS;
-const DEFAULT_DROITS = DEFAULT_DROITS_AGENT;
+const FONCTIONS = ['Agent de sécurité (APS)', 'SSIAP 1', 'SSIAP 2', 'SSIAP 3', 'Chef de poste', 'SST'];
+const NATIONALITES = ['Française', 'Union européenne', 'Autre'];
+const GOLD = 'bg-[#e4b54a] hover:bg-[#d7a63a] text-[#1c1403]';
+
+const empty = {
+  civilite: 'M.',
+  first_name: '',
+  last_name: '',
+  email: '',
+  phone: '',
+  address: '',
+  date_naissance: '',
+  lieu_naissance: '',
+  nationalite: 'Française',
+  card_number: '',
+  card_expiry: '',
+  status: 'actif',
+  hire_date: '',
+  date_fin_contrat: '',
+  fonction: '',
+  site_id_defaut: '',
+  hourly_rate: '',
+  type_employe: 'Employé',
+  notes: '',
+  photo_url: '',
+  acces_espace_agent: true,
+};
+
+function daysUntil(value) {
+  if (!value) return null;
+  const date = new Date(`${String(value).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return Math.round((date.getTime() - Date.now()) / 86400000);
+}
 
 export default function AgentForm({ open, onClose, onSubmit, agent }) {
+  const { companyId } = useCompany();
   const [tab, setTab] = useState('infos');
-  const [creerComptePhoenix, setCreerComptePhoenix] = useState(false);
+  const [form, setForm] = useState(empty);
+  const [droits, setDroits] = useState({ ...DEFAULT_DROITS_AGENT });
   const [agentRole, setAgentRole] = useState('agent');
-  const [droits, setDroits] = useState({ ...DEFAULT_DROITS });
-
-  const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '',
-    card_number: '', card_expiry: '', status: 'actif',
-    address: '', hire_date: '', hourly_rate: '', notes: '', role: 'agent'
-  });
+  const [creerCompte, setCreerCompte] = useState(false);
+  const [notifications, setNotifications] = useState({ expiration: true, rappels: true });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
     if (agent) {
-      setForm({ ...agent, hourly_rate: agent.hourly_rate || '' });
-      setAgentRole(agent.role || 'agent');
+      setForm({
+        ...empty,
+        ...agent,
+        hourly_rate: agent.hourly_rate || '',
+        civilite: agent.civilite || 'M.',
+        nationalite: agent.nationalite || 'Française',
+        status: agent.status || 'actif',
+        acces_espace_agent: agent.acces_espace_agent !== false,
+      });
       setDroits(mergeAgentDroits(agent));
-      setCreerComptePhoenix(false);
+      setAgentRole(agent.role || 'agent');
+      setNotifications({ expiration: true, rappels: true, ...(agent.notifications || {}) });
     } else {
-      setForm({ first_name: '', last_name: '', email: '', phone: '', card_number: '', card_expiry: '', status: 'actif', address: '', hire_date: '', hourly_rate: '', notes: '', role: 'agent' });
+      setForm({ ...empty });
+      setDroits({ ...DEFAULT_DROITS_AGENT });
       setAgentRole('agent');
-      setDroits({ ...DEFAULT_DROITS });
-      setCreerComptePhoenix(false);
+      setNotifications({ expiration: true, rappels: true });
     }
+    setCreerCompte(false);
     setTab('infos');
   }, [agent, open]);
 
-  const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
-  const toggleDroit = (key) => setDroits(prev => ({ ...prev, [key]: !prev[key] }));
+  const { data: sites = [] } = useQuery({
+    queryKey: ['sites', companyId],
+    queryFn: () => base44.entities.Site.filter({ company_id: companyId }),
+    enabled: !!companyId && open,
+  });
+  const { data: documents = [] } = useQuery({
+    queryKey: ['documents', companyId],
+    queryFn: () => base44.entities.Document.filter({ company_id: companyId }),
+    enabled: !!companyId && open && !!agent?.id,
+  });
 
-  const handleSubmit = (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (creerComptePhoenix && !form.email) {
+  const patch = (partial) => setForm((current) => ({ ...current, ...partial }));
+  const agentDocs = documents.filter((item) => item.target_id === agent?.id);
+  const cardDays = daysUntil(form.card_expiry);
+  const initials = `${form.first_name?.[0] || ''}${form.last_name?.[0] || ''}`.toUpperCase() || '—';
+  const fonctionOptions = form.fonction && !FONCTIONS.includes(form.fonction) ? [form.fonction, ...FONCTIONS] : FONCTIONS;
+  const habilitations = useMemo(() => {
+    const text = `${form.fonction || ''} ${form.notes || ''}`;
+    return ['SSIAP 1', 'SSIAP 2', 'SSIAP 3', 'APS', 'SST'].filter((label) => text.toUpperCase().includes(label.replace(' ', '')));
+  }, [form.fonction, form.notes]);
+
+  const uploadPhoto = async (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La photo dépasse 5 Mo');
+      return;
+    }
+    setUploading(true);
+    try {
+      const { file_url: url } = await base44.integrations.Core.UploadFile({ file });
+      patch({ photo_url: url });
+    } catch (error) {
+      toast.error(error.message || 'La photo n’a pas pu être envoyée');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = (draft) => {
+    if (!form.first_name || !form.last_name) {
+      toast.error('Le prénom et le nom sont requis');
+      setTab('infos');
+      return;
+    }
+    if (creerCompte && !form.email) {
       toast.error('Indiquez un email pour créer un compte Phoenix Sekur');
+      setTab('acces');
       return;
     }
     onSubmit({
@@ -63,184 +148,287 @@ export default function AgentForm({ open, onClose, onSubmit, agent }) {
       hourly_rate: form.hourly_rate ? Number(form.hourly_rate) : undefined,
       role: agentRole,
       droits_portail: droits,
-      creer_compte_phoenix: creerComptePhoenix,
+      notifications,
+      creer_compte_phoenix: draft ? false : creerCompte,
+      draft: !!draft,
+      acces_espace_agent: form.acces_espace_agent !== false,
     });
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{agent ? 'Modifier l\'agent' : 'Nouvel agent'}</DialogTitle>
-        </DialogHeader>
-
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full mb-4">
-            <TabsTrigger value="infos" className="flex-1">Informations</TabsTrigger>
-            <TabsTrigger value="droits" className="flex-1 gap-1.5">
-              <Lock className="w-3.5 h-3.5" /> Droits portail
-            </TabsTrigger>
-            <TabsTrigger value="compte" className="flex-1 gap-1.5">
-              <Shield className="w-3.5 h-3.5" /> Compte
-            </TabsTrigger>
-          </TabsList>
-
-          {/* ===== INFOS ===== */}
-          <TabsContent value="infos">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Prénom *</Label>
-                  <Input value={form.first_name} onChange={e => update('first_name', e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Nom *</Label>
-                  <Input value={form.last_name} onChange={e => update('last_name', e.target.value)} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => update('email', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Téléphone</Label>
-                  <Input value={form.phone} onChange={e => update('phone', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>N° carte pro CNAPS</Label>
-                  <Input value={form.card_number} onChange={e => update('card_number', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Expiration carte</Label>
-                  <Input type="date" value={form.card_expiry} onChange={e => update('card_expiry', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Date d'embauche</Label>
-                  <Input type="date" value={form.hire_date} onChange={e => update('hire_date', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Taux horaire (€)</Label>
-                  <Input type="number" step="0.01" value={form.hourly_rate} onChange={e => update('hourly_rate', e.target.value)} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Statut</Label>
-                <Select value={form.status} onValueChange={v => update('status', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="actif">Actif</SelectItem>
-                    <SelectItem value="inactif">Inactif</SelectItem>
-                    <SelectItem value="en_mission">En mission</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Adresse</Label>
-                <AddressAutocomplete
-                  value={form.address}
-                  onChange={v => update('address', v)}
-                  onPlaceSelect={(p) => {
-                    if (p.address) update('address', p.address);
-                    if (p.postal_code) update('postal_code', p.postal_code);
-                    if (p.city) update('city', p.city);
-                    if (p.country) update('country', p.country);
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Textarea value={form.notes} onChange={e => update('notes', e.target.value)} rows={3} />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={onClose}>Annuler</Button>
-                <Button type="submit">{agent ? 'Modifier' : 'Créer'}</Button>
-              </div>
-            </form>
-          </TabsContent>
-
-          {/* ===== DROITS PORTAIL ===== */}
-          <TabsContent value="droits" className="space-y-4">
-            <div className="p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground flex items-start gap-2">
-              <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              <span>Ces droits définissent ce que l'agent peut voir dans son portail. Les modifications sont effectives immédiatement après enregistrement.</span>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 sm:py-4 px-0 sm:px-4 overflow-y-auto">
+      <div className="bg-[#f7f8fb] sm:rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[94vh] overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-5 py-4 bg-[#10192b] text-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-[#e4b54a] text-[#1c1403] flex items-center justify-center shrink-0">
+              <User className="w-5 h-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold truncate">{agent ? 'Modifier le collaborateur' : 'Nouveau collaborateur'}</h2>
+              <p className="text-xs text-white/60">Créer la fiche d’un agent et gérer ses habilitations, documents et accès.</p>
             </div>
-            <div className="space-y-2">
-              {DROITS_AGENT.map(d => (
-                <div key={d.key} className="flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted/20 transition-colors">
-                  <div className="flex-1 mr-4">
-                    <p className="text-sm font-medium">{d.label}</p>
-                    <p className="text-xs text-muted-foreground">{d.description}</p>
-                  </div>
-                  <Switch
-                    checked={droits[d.key] ?? false}
-                    onCheckedChange={() => toggleDroit(d.key)}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-3 pt-2 border-t">
-              <Button variant="outline" onClick={onClose}>Annuler</Button>
-              <Button onClick={handleSubmit}>{agent ? 'Enregistrer' : 'Créer'}</Button>
-            </div>
-          </TabsContent>
+          </div>
+          <button type="button" onClick={onClose} className="w-9 h-9 rounded-full hover:bg-white/10 flex items-center justify-center" aria-label="Fermer">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-          {/* ===== COMPTE & ACCÈS ===== */}
-          <TabsContent value="compte" className="space-y-5">
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold">Rôle de l'agent</Label>
-              <div className="space-y-2">
-                {ROLE_OPTIONS.map(r => (
-                  <div
-                    key={r.value}
-                    onClick={() => setAgentRole(r.value)}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${agentRole === r.value ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{r.label}</p>
-                      <p className="text-xs text-muted-foreground">{r.description}</p>
+        <div className="shrink-0 flex overflow-x-auto bg-white border-b">
+          {TABS.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.key;
+            return (
+              <button key={item.key} type="button" onClick={() => setTab(item.key)} className={cn('shrink-0 inline-flex items-center gap-2 px-4 py-3 text-sm border-b-2', active ? 'border-[#e4b54a] text-[#1c1403] font-semibold bg-[#fffaf0]' : 'border-transparent text-slate-500')}>
+                <Icon className="w-4 h-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5">
+          <div className="grid xl:grid-cols-[1fr_280px] gap-4">
+            <div className="space-y-4 min-w-0">
+              {tab === 'infos' && (
+                <>
+                  <Card icon={User} title="Identité">
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <label className="w-28 h-28 shrink-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center text-[11px] text-slate-500 cursor-pointer overflow-hidden">
+                        {form.photo_url ? <img src={form.photo_url} alt="" className="w-full h-full object-cover" /> : <><User className="w-6 h-6 mb-1" />{uploading ? 'Envoi…' : 'Ajouter une photo'}<span>JPG, PNG (max. 5 Mo)</span></>}
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => uploadPhoto(event.target.files?.[0])} />
+                      </label>
+                      <div className="grid sm:grid-cols-3 gap-3 flex-1">
+                        <Field label="Civilité">
+                          <Select value={form.civilite} onValueChange={(value) => patch({ civilite: value })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="M.">M.</SelectItem>
+                              <SelectItem value="Mme">Mme</SelectItem>
+                              <SelectItem value="Autre">Autre</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field label="Prénom *"><Input value={form.first_name} onChange={(event) => patch({ first_name: event.target.value })} /></Field>
+                        <Field label="Nom *"><Input value={form.last_name} onChange={(event) => patch({ last_name: event.target.value })} /></Field>
+                        <Field label="Date de naissance"><Input type="date" value={String(form.date_naissance || '').slice(0, 10)} onChange={(event) => patch({ date_naissance: event.target.value })} /></Field>
+                        <Field label="Lieu de naissance"><Input value={form.lieu_naissance || ''} onChange={(event) => patch({ lieu_naissance: event.target.value })} placeholder="Ville, pays" /></Field>
+                        <Field label="Nationalité">
+                          <Select value={form.nationalite || 'Française'} onValueChange={(value) => patch({ nationalite: value })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(form.nationalite && !NATIONALITES.includes(form.nationalite) ? [form.nationalite, ...NATIONALITES] : NATIONALITES).map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      </div>
                     </div>
-                    {agentRole === r.value && <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />}
+                  </Card>
+                  <Card icon={Mail} title="Coordonnées">
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <Field label="Email professionnel"><Input type="email" value={form.email || ''} onChange={(event) => patch({ email: event.target.value })} placeholder="email@phoenixsekur.fr" /></Field>
+                      <Field label="Téléphone"><Input value={form.phone || ''} onChange={(event) => patch({ phone: event.target.value })} placeholder="06 00 00 00 00" /></Field>
+                      <Field label="Adresse">
+                        <AddressAutocomplete value={form.address || ''} onChange={(value) => patch({ address: value })} onPlaceSelect={(place) => patch({ address: place.address || form.address, postal_code: place.postal_code, city: place.city })} />
+                      </Field>
+                    </div>
+                  </Card>
+                  <Card icon={CreditCard} title="Identifiants professionnels">
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <Field label="N° carte professionnelle CNAPS"><Input value={form.card_number || ''} onChange={(event) => patch({ card_number: event.target.value })} placeholder="CARTE-123456" /></Field>
+                      <Field label="Date d’expiration"><Input type="date" value={String(form.card_expiry || '').slice(0, 10)} onChange={(event) => patch({ card_expiry: event.target.value })} /></Field>
+                    </div>
+                  </Card>
+                  <Card icon={Briefcase} title="Statut et poste principal">
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <Field label="Statut">
+                        <Select value={form.status || 'actif'} onValueChange={(value) => patch({ status: value })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="actif">Actif</SelectItem>
+                            <SelectItem value="inactif">Inactif</SelectItem>
+                            <SelectItem value="en_mission">En mission</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Fonction / poste">
+                        <Select value={form.fonction || ''} onValueChange={(value) => patch({ fonction: value })}>
+                          <SelectTrigger><SelectValue placeholder="Agent de sécurité (APS)" /></SelectTrigger>
+                          <SelectContent>{fonctionOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Affectation par défaut">
+                        <Select value={form.site_id_defaut || 'none'} onValueChange={(value) => patch({ site_id_defaut: value === 'none' ? '' : value })}>
+                          <SelectTrigger><SelectValue placeholder="Non définie" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Non définie</SelectItem>
+                            {sites.map((site) => <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </div>
+                  </Card>
+                </>
+              )}
+
+              {tab === 'documents' && (
+                <Card icon={Shield} title="Documents & habilitations" text="Seules les pièces déjà enregistrées sont affichées.">
+                  <DocLine title="Carte pro CNAPS" detail={form.card_number || 'Numéro non renseigné'} expiry={form.card_expiry} days={cardDays} />
+                  {habilitations.map((label) => <DocLine key={label} title={label} detail="Mentionné sur la fonction. Aucune date d’expiration n’est enregistrée." />)}
+                  {agentDocs.map((item) => <DocLine key={item.id} title={item.name || 'Document'} detail={item.type || 'Pièce jointe'} expiry={item.date} href={item.file_url} />)}
+                  {!form.card_number && habilitations.length === 0 && agentDocs.length === 0 && (
+                    <p className="text-sm text-slate-500">Aucune habilitation datée sur cette fiche.</p>
+                  )}
+                  {cardDays != null && cardDays >= 0 && cardDays <= 30 && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">Alerte : la carte professionnelle expire dans {cardDays} jour{cardDays > 1 ? 's' : ''}.</div>
+                  )}
+                </Card>
+              )}
+
+              {tab === 'emploi' && (
+                <Card icon={Briefcase} title="Emploi & contrat">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <Field label="Date d’embauche"><Input type="date" value={String(form.hire_date || '').slice(0, 10)} onChange={(event) => patch({ hire_date: event.target.value })} /></Field>
+                    <Field label="Fin de contrat"><Input type="date" value={String(form.date_fin_contrat || '').slice(0, 10)} onChange={(event) => patch({ date_fin_contrat: event.target.value })} /></Field>
+                    <Field label="Type">
+                      <Select value={form.type_employe || 'Employé'} onValueChange={(value) => patch({ type_employe: value })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Employé">Employé</SelectItem>
+                          <SelectItem value="Intérimaire">Intérimaire</SelectItem>
+                          <SelectItem value="Sous-traitant">Sous-traitant</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Taux horaire (€)"><Input type="number" step="0.01" value={form.hourly_rate} onChange={(event) => patch({ hourly_rate: event.target.value })} /></Field>
                   </div>
-                ))}
-              </div>
+                  <Field label="Notes"><Textarea value={form.notes || ''} onChange={(event) => patch({ notes: event.target.value })} rows={4} /></Field>
+                </Card>
+              )}
+
+              {tab === 'acces' && (
+                <>
+                  <Card icon={Monitor} title="Compte collaborateur">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-slate-600">Autoriser le collaborateur à se connecter à son espace.</p>
+                      <Switch checked={form.acces_espace_agent !== false} onCheckedChange={(value) => patch({ acces_espace_agent: value })} className="data-[state=checked]:bg-emerald-500" />
+                    </div>
+                    <ul className="mt-3 space-y-1 text-sm text-emerald-800 bg-emerald-50 rounded-xl p-3">
+                      <li>Consulter son planning et ses vacations</li>
+                      <li>Accéder à sa prise de poste</li>
+                      <li>Faire des demandes (congé, absence…)</li>
+                      <li>Recevoir des notifications</li>
+                    </ul>
+                    <label className="mt-3 flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={creerCompte} onChange={(event) => setCreerCompte(event.target.checked)} className="accent-[#c9a227]" />
+                      Envoyer une invitation pour créer le compte
+                    </label>
+                  </Card>
+                  <Card icon={Shield} title="Rôle du compte">
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {[
+                        ['agent', 'Collaborateur (agent)', 'Espace collaborateur'],
+                        ['superviseur', 'Superviseur', 'Espace collaborateur et suivi d’équipe'],
+                      ].map(([value, label, text]) => (
+                        <button key={value} type="button" onClick={() => setAgentRole(value)} className={cn('text-left rounded-xl border px-3 py-2', agentRole === value ? 'border-[#e4b54a] bg-[#fffaf0]' : 'border-slate-200')}>
+                          <span className="block text-sm font-medium">{label}</span>
+                          <span className="block text-xs text-slate-500">{text}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500">Les rôles métier détaillés se règlent dans Rôles & permissions, sans changer ceux des autres collaborateurs.</p>
+                  </Card>
+                  <Card icon={Shield} title="Droits du portail">
+                    <div className="space-y-2">
+                      {DROITS_AGENT_OPTIONS.map((item) => (
+                        <div key={item.key} className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
+                          <div>
+                            <p className="text-sm font-medium">{item.label}</p>
+                            <p className="text-xs text-slate-500">{item.description}</p>
+                          </div>
+                          <Switch checked={!!droits[item.key]} onCheckedChange={() => setDroits((current) => ({ ...current, [item.key]: !current[item.key] }))} className="data-[state=checked]:bg-emerald-500" />
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </>
+              )}
+
+              {tab === 'prefs' && (
+                <Card icon={Bell} title="Notifications">
+                  <Toggle label="Alertes d’expiration des documents" checked={notifications.expiration !== false} onChange={(value) => setNotifications((current) => ({ ...current, expiration: value }))} />
+                  <Toggle label="Rappels administratifs (renouvellement, visite…)" checked={notifications.rappels !== false} onChange={(value) => setNotifications((current) => ({ ...current, rappels: value }))} />
+                </Card>
+              )}
             </div>
 
-            <div className="border-t pt-4 space-y-3">
-              <div className="flex items-start gap-3 rounded-xl border border-border p-4 bg-muted/20">
-                <Checkbox
-                  id="creer-compte-phoenix-agent"
-                  checked={creerComptePhoenix}
-                  onCheckedChange={(v) => setCreerComptePhoenix(!!v)}
-                  className="mt-0.5"
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="creer-compte-phoenix-agent" className="text-sm font-semibold cursor-pointer">
-                    Créer un compte Phoenix Sekur
-                  </Label>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Si coché, une invitation est envoyée automatiquement à l&apos;email de la fiche
-                    (au nom de votre société) pour activer l&apos;espace salarié.
-                  </p>
+            <aside className="hidden xl:block">
+              <div className="rounded-2xl bg-[#10192b] text-white p-4 sticky top-0">
+                <p className="text-sm font-semibold mb-3">Aperçu collaborateur</p>
+                <div className="w-16 h-16 rounded-full bg-white/10 mx-auto flex items-center justify-center text-lg font-bold overflow-hidden">
+                  {form.photo_url ? <img src={form.photo_url} alt="" className="w-full h-full object-cover" /> : initials}
                 </div>
+                <p className="text-center font-semibold mt-3">{form.first_name || 'Prénom'} {form.last_name || 'Nom'}</p>
+                <p className="text-center text-xs text-white/60">{form.fonction || 'Fonction non renseignée'}</p>
+                <p className="mt-3 text-center text-xs"><span className={cn('px-2 py-1 rounded-full', form.status === 'inactif' ? 'bg-rose-500/20 text-rose-100' : 'bg-emerald-500/20 text-emerald-100')}>{form.status === 'inactif' ? 'Inactif' : 'Actif'}</span></p>
               </div>
-              <div className="flex items-start gap-2 p-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
-                <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>Un email valide est requis sur la fiche pour créer le compte.</span>
-              </div>
-            </div>
+            </aside>
+          </div>
+        </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={onClose}>Fermer</Button>
-              <Button onClick={handleSubmit}>{agent ? 'Enregistrer les modifications' : 'Créer l\'agent'}</Button>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+        <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 border-t bg-white">
+          <Button type="button" variant="outline" onClick={onClose} className="sm:mr-auto">Annuler</Button>
+          <Button type="button" variant="outline" onClick={() => save(true)}>Enregistrer en brouillon</Button>
+          <Button type="button" onClick={() => save(false)} className={GOLD}>{agent ? 'Enregistrer' : 'Créer le collaborateur'}</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Card({ icon: Icon, title, text, children }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="w-8 h-8 rounded-full bg-[#f6e7c3] text-[#1c1403] flex items-center justify-center"><Icon className="w-4 h-4" /></span>
+        <div>
+          <h3 className="font-semibold text-[#10192b]">{title}</h3>
+          {text && <p className="text-xs text-slate-500">{text}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-slate-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Toggle({ label, checked, onChange }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
+      <span className="text-sm">{label}</span>
+      <Switch checked={checked} onCheckedChange={onChange} className="data-[state=checked]:bg-emerald-500" />
+    </div>
+  );
+}
+
+function DocLine({ title, detail, expiry, days, href }) {
+  const soon = days != null && days >= 0 && days <= 30;
+  return (
+    <div className={cn('flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm', soon && 'border-rose-200 bg-rose-50')}>
+      <div className="min-w-0">
+        <p className="font-medium truncate">{title}</p>
+        <p className="text-xs text-slate-500 truncate">{detail}{expiry ? ` · ${String(expiry).slice(0, 10)}` : ''}</p>
+      </div>
+      {href && <a href={href} target="_blank" rel="noreferrer" className="text-xs text-amber-700 shrink-0">Ouvrir</a>}
+    </div>
   );
 }
