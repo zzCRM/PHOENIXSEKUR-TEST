@@ -368,6 +368,25 @@ model PriseDeService {
   @@map("prise_de_service")
 }
 
+model Pointeau {
+  id          String   @id
+  companyId   String   @map("company_id")
+  siteId      String   @map("site_id")
+  status      String   @default("brouillon")
+  tagKey      String?  @map("tag_key")
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdById String?  @map("created_by_id")
+  createdBy   String?  @map("created_by")
+  isSample    Boolean  @default(false) @map("is_sample")
+
+  @@unique([companyId, tagKey])
+  @@index([companyId])
+  @@index([siteId])
+  @@map("pointeaux")
+}
+
 model Ronde {
   id          String   @id
   companyId   String?  @map("company_id")

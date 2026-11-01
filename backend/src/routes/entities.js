@@ -14,6 +14,8 @@ import { isSuperAdmin } from '../lib/superadmin.js';
 import { PLATFORM_COMPANY_ID, isPlatformCompanyId } from '../lib/tenant.js';
 import { buildScope, canRead, canWrite, findAgentFiche, presentRecord } from '../lib/access.js';
 import { ROLES_KIND } from '../../../shared/rolePermissions.js';
+import { IntegrityError } from '../../../shared/pointeaux.js';
+import { beforeWrite, findDuplicateByClientEventId } from '../lib/integrity.js';
 
 const router = Router();
 
@@ -53,6 +55,17 @@ async function scopeFor(req) {
   const rolesRow = settings.map(toApiRecord).find((row) => row.kind === ROLES_KIND || String(row.id || '').startsWith('roles-acces-'));
   scope.roles = Array.isArray(rolesRow?.roles) ? rolesRow.roles : [];
   return scope;
+}
+
+function sendError(res, err, label) {
+  if (err instanceof IntegrityError) {
+    return res.status(err.status).json({ error: err.message, code: err.code, details: err.details });
+  }
+  if (err?.code === 'P2002') {
+    return res.status(409).json({ error: 'Cet enregistrement existe déjà (valeur unique déjà utilisée).', code: 'unique' });
+  }
+  console.error(label, err);
+  return res.status(500).json({ error: err.message });
 }
 
 async function recordAudit(req, action, entity, entityId, companyId) {
@@ -172,11 +185,24 @@ router.post('/:entityName', async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
+    const duplicate = await findDuplicateByClientEventId(entityName, companyId, parsed.data);
+    if (duplicate) return res.status(200).json(toApiRecord(duplicate));
+
+    const guard = await beforeWrite({
+      entityName,
+      operation: 'create',
+      companyId,
+      id,
+      incoming: parsed.data,
+      previous: null,
+    });
+
     const row = await delegate.create({
       data: {
         id,
         companyId,
-        data: { ...parsed.data, company_id: companyId },
+        ...(guard.columns || {}),
+        data: { ...(guard.data || parsed.data), company_id: companyId },
         createdById: parsed.createdById || req.user?.sub,
         createdBy: parsed.createdBy,
         isSample: parsed.isSample,
@@ -186,8 +212,7 @@ router.post('/:entityName', async (req, res) => {
     await recordAudit(req, 'create', entityName, row.id, companyId);
     res.status(201).json(toApiRecord(row));
   } catch (err) {
-    console.error('Entity create error:', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err, 'Entity create error:');
   }
 });
 
@@ -217,11 +242,21 @@ router.put('/:entityName/:id', async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
+    const guard = await beforeWrite({
+      entityName,
+      operation: 'update',
+      companyId: nextCompanyId,
+      id,
+      incoming: parsed.data,
+      previous: existing,
+    });
+
     const row = await delegate.update({
       where: { id },
       data: {
         companyId: nextCompanyId,
-        data: { ...mergedData, company_id: nextCompanyId },
+        ...(guard.columns || {}),
+        data: { ...(guard.data || mergedData), company_id: nextCompanyId },
         createdById: parsed.createdById ?? existing.createdById,
         createdBy: parsed.createdBy ?? existing.createdBy,
         isSample: parsed.isSample ?? existing.isSample,
@@ -231,8 +266,7 @@ router.put('/:entityName/:id', async (req, res) => {
     await recordAudit(req, 'update', entityName, row.id, nextCompanyId);
     res.json(toApiRecord(row));
   } catch (err) {
-    console.error('Entity update error:', err);
-    res.status(500).json({ error: err.message });
+    sendError(res, err, 'Entity update error:');
   }
 });
 
@@ -249,11 +283,19 @@ router.delete('/:entityName/:id', async (req, res) => {
     if (!canWrite(req.user, entityName, record, 'delete', scope)) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
+    await beforeWrite({
+      entityName,
+      operation: 'delete',
+      companyId: existing.companyId,
+      id,
+      incoming: {},
+      previous: existing,
+    });
     await delegate.delete({ where: { id } });
     await recordAudit(req, 'delete', entityName, id, existing.companyId);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err, 'Entity delete error:');
   }
 });
 

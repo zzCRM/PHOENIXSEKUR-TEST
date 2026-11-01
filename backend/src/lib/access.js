@@ -112,7 +112,7 @@ export function canRead(user, entity, record, scope = { siteIds: new Set() }) {
     if (entity === 'Mission' || entity === 'PriseDeService' || entity === 'FicheDePaie' || entity === 'RondeExecution' || entity === 'Geolocation' || entity === 'Conge') {
       return ownAgent(record, user, scope);
     }
-    if (entity === 'Ronde' || entity === 'MainCourante' || entity === 'CahierConsignes' || entity === 'BonIntervention' || entity === 'PostePlanning') {
+    if (entity === 'Ronde' || entity === 'Pointeau' || entity === 'MainCourante' || entity === 'CahierConsignes' || entity === 'BonIntervention' || entity === 'PostePlanning') {
       return onAgentSite(record, scope);
     }
     if (entity === 'Document') {

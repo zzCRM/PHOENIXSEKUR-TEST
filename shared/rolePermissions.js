@@ -109,6 +109,7 @@ export const PERMISSION_MODULES = [
 export const ENTITY_PERMISSION = {
   Mission: { read: 'planning.consulter', create: 'planning.creer', update: 'planning.modifier', delete: 'planning.supprimer' },
   Ronde: { read: 'rondes.consulter', create: 'rondes.creer', update: 'rondes.modifier', delete: 'rondes.supprimer' },
+  Pointeau: { read: 'points_controle.consulter', create: 'points_controle.creer', update: 'points_controle.modifier', delete: 'points_controle.supprimer' },
   RondeExecution: { read: 'rondes.consulter', create: 'rondes.valider', update: 'rondes.valider', delete: 'rondes.supprimer' },
   BonIntervention: { read: 'audits.consulter', create: 'audits.creer', update: 'audits.modifier', delete: 'audits.supprimer' },
   MainCourante: { read: 'main_courante.consulter', create: 'main_courante.creer', update: 'main_courante.modifier', delete: 'main_courante.cloturer' },

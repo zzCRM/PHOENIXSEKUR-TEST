@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis;
@@ -31,6 +32,7 @@ export const ENTITY_MODELS = {
   MainCourante: 'mainCourante',
   Mission: 'mission',
   PostePlanning: 'postePlanning',
+  Pointeau: 'pointeau',
   PretMateriel: 'pretMateriel',
   PriseDeService: 'priseDeService',
   Ronde: 'ronde',
@@ -137,5 +139,5 @@ export function sortRecords(records, sort) {
 }
 
 export function generateId() {
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  return randomUUID();
 }
