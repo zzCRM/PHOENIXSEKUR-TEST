@@ -152,6 +152,9 @@ export function canWrite(user, entity, record, operation, scope = { siteIds: new
   if (user.role === 'supervisor') return operation !== 'delete' && entity !== 'Invoice' && entity !== 'FicheDePaie' && entity !== 'User';
   if (isAgentRole(user)) {
     if (operation === 'delete') return false;
+    if (entity === 'Alerte') {
+      return operation === 'create' && ownAgent(record, user, scope) && (!record.site_id || scope.siteIds.has(record.site_id));
+    }
     if (!AGENT_WRITE.has(entity)) return false;
     return canRead(user, entity, record, scope);
   }

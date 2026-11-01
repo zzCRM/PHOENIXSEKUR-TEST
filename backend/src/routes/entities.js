@@ -163,6 +163,20 @@ router.get('/:entityName/:id', async (req, res) => {
   }
 });
 
+const inflightCreates = new Map();
+
+async function serializeByEventId(key, task) {
+  if (!key) return task();
+  const previous = inflightCreates.get(key) || Promise.resolve();
+  const current = previous.catch(() => {}).then(task);
+  inflightCreates.set(key, current);
+  try {
+    return await current;
+  } finally {
+    if (inflightCreates.get(key) === current) inflightCreates.delete(key);
+  }
+}
+
 router.post('/:entityName', async (req, res) => {
   try {
     const { entityName } = req.params;
@@ -185,32 +199,36 @@ router.post('/:entityName', async (req, res) => {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
-    const duplicate = await findDuplicateByClientEventId(entityName, companyId, parsed.data);
-    if (duplicate) return res.status(200).json(toApiRecord(duplicate));
+    const eventId = parsed.data?.client_event_id;
+    const lockKey = eventId ? `${entityName}:${companyId}:${eventId}` : null;
+    const outcome = await serializeByEventId(lockKey, async () => {
+      const duplicate = await findDuplicateByClientEventId(entityName, companyId, parsed.data);
+      if (duplicate) return { status: 200, row: duplicate };
 
-    const guard = await beforeWrite({
-      entityName,
-      operation: 'create',
-      companyId,
-      id,
-      incoming: parsed.data,
-      previous: null,
-    });
-
-    const row = await delegate.create({
-      data: {
-        id,
+      const guard = await beforeWrite({
+        entityName,
+        operation: 'create',
         companyId,
-        ...(guard.columns || {}),
-        data: { ...(guard.data || parsed.data), company_id: companyId },
-        createdById: parsed.createdById || req.user?.sub,
-        createdBy: parsed.createdBy,
-        isSample: parsed.isSample,
-      },
-    });
+        id,
+        incoming: parsed.data,
+        previous: null,
+      });
 
-    await recordAudit(req, 'create', entityName, row.id, companyId);
-    res.status(201).json(toApiRecord(row));
+      const created = await delegate.create({
+        data: {
+          id,
+          companyId,
+          ...(guard.columns || {}),
+          data: { ...(guard.data || parsed.data), company_id: companyId },
+          createdById: parsed.createdById || req.user?.sub,
+          createdBy: parsed.createdBy,
+          isSample: parsed.isSample,
+        },
+      });
+      await recordAudit(req, 'create', entityName, created.id, companyId);
+      return { status: 201, row: created };
+    });
+    res.status(outcome.status).json(toApiRecord(outcome.row));
   } catch (err) {
     sendError(res, err, 'Entity create error:');
   }

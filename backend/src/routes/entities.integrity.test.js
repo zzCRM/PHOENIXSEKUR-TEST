@@ -205,3 +205,22 @@ test('visibilité : l’agent lit les pointeaux de ses sites, le client ne les v
   const etranger = await api('GET', '/Pointeau', { token: tokens.autre });
   assert.equal(etranger.body.length, 0);
 });
+
+test('alertes : un agent peut créer les siennes sur ses sites, pas celles d’un autre ni sur un site étranger', { skip }, async () => {
+  const propre = await create('Alerte', { type: 'debut_ronde', agent_id: agentId, site_id: siteA.id, message: 'Début' }, { token: tokens.agent });
+  assert.equal(propre.status, 201);
+  const autreAgent = await create('Alerte', { type: 'debut_ronde', agent_id: 'quelquun-d-autre', site_id: siteA.id, message: 'Usurpation' }, { token: tokens.agent });
+  assert.equal(autreAgent.status, 403);
+  const autreSite = await create('Alerte', { type: 'debut_ronde', agent_id: agentId, site_id: siteB.id, message: 'Hors périmètre' }, { token: tokens.agent });
+  assert.equal(autreSite.status, 403);
+  const lecture = await api('GET', '/Alerte', { token: tokens.agent });
+  assert.equal(lecture.body.length, 0);
+});
+
+test('idempotence : deux envois simultanés du même client_event_id ne créent qu’un enregistrement', { skip }, async () => {
+  const body = { type: 'incident', agent_id: agentId, site_id: siteA.id, client_event_id: `evt-${randomUUID()}`, content: 'Doublon ?' };
+  const [a, b, c] = await Promise.all([1, 2, 3].map(() => create('MainCourante', body, { token: tokens.agent })));
+  const statuses = [a.status, b.status, c.status].sort();
+  assert.deepEqual(statuses, [200, 200, 201]);
+  assert.equal(new Set([a.body.id, b.body.id, c.body.id]).size, 1);
+});
