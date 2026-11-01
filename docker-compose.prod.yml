@@ -16,7 +16,9 @@ services:
       retries: 5
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: phoenixsekur-api
     restart: unless-stopped
     depends_on:
@@ -50,8 +52,8 @@ services:
 
   frontend:
     build:
-      context: ./base44-export
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: base44-export/Dockerfile
     container_name: phoenixsekur-web
     restart: unless-stopped
 

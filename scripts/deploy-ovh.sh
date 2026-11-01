@@ -31,13 +31,16 @@ bash scripts/ensure-vitrine-env.sh .env.production 2>/dev/null || true
 bash scripts/ensure-superadmin-env.sh .env.production 2>/dev/null || true
 envsubst '${DOMAIN} ${VITRINE_DOMAIN} ${ROOT_DOMAIN} ${ACME_EMAIL}' < Caddyfile.template > Caddyfile
 
-# Évite les conflits de noms Docker sur phoenixsekur-api (recreate partiel)
+echo "🔨 Construction des images..."
+docker compose -f docker-compose.prod.yml --env-file .env.production build
+
+# Seulement après une construction réussie : un échec ne doit pas supprimer l'API encore en service.
 echo "🧹 Nettoyage containers API conflictuels..."
 docker ps -a --format '{{.ID}} {{.Names}}' | awk '/phoenixsekur-api/ {print $1}' | while read -r id; do
   docker rm -f "$id" 2>/dev/null || true
 done
 
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build --remove-orphans
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --remove-orphans
 
 echo ""
 echo "📋 Caddyfile actif:"

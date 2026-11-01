@@ -142,6 +142,13 @@ export default function Login() {
               </div>
             )}
 
+            <a
+              href="https://www.phoenixsekur.com/mot-de-passe-oublie.html"
+              className="block text-sm text-white/70 underline underline-offset-2 hover:text-white"
+            >
+              Mot de passe oublié ?
+            </a>
+
             <Button
               type="submit"
               disabled={loading}

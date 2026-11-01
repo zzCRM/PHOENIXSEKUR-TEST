@@ -13,7 +13,9 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: phoenixsekur-api
     restart: unless-stopped
     depends_on:
